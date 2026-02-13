@@ -32,6 +32,11 @@ const (
 	HTTP_REQUEST_DURATION     = "http.server.request.duration"
 )
 
+// Baggage keys for cross-cutting context propagation
+const (
+	BAGGAGE_PAYMENT_METHOD = "payment.method"
+)
+
 // Business attribute constants
 const (
 	ATTR_USER_ID          = "user.id"

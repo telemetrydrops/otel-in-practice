@@ -30,6 +30,7 @@ func NewProductRepository(db *gorm.DB) *ProductRepository {
 // Create inserts a new product into the database
 func (r *ProductRepository) Create(ctx context.Context, product *models.Product) error {
 	ctx, span := r.tracer.Start(ctx, "INSERT products",
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "INSERT"),
@@ -52,6 +53,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *models.Product)
 // GetByID retrieves a product by ID
 func (r *ProductRepository) GetByID(ctx context.Context, id string) (*models.Product, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_PRODUCT_SELECT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
@@ -72,6 +74,7 @@ func (r *ProductRepository) GetByID(ctx context.Context, id string) (*models.Pro
 // This method deliberately contains an N+1 query problem for exercise purposes
 func (r *ProductRepository) List(ctx context.Context, category string, limit int) ([]*models.Product, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_PRODUCT_SELECT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
@@ -113,6 +116,7 @@ func (r *ProductRepository) List(ctx context.Context, category string, limit int
 // UpdateStock updates the stock quantity for a product
 func (r *ProductRepository) UpdateStock(ctx context.Context, id string, quantity int) error {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_PRODUCT_UPDATE,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "UPDATE"),
@@ -140,6 +144,7 @@ func (r *ProductRepository) UpdateStock(ctx context.Context, id string, quantity
 // CheckStock verifies if a product has sufficient stock
 func (r *ProductRepository) CheckStock(ctx context.Context, id string, requiredQuantity int) (bool, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_INVENTORY_CHECK,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String(telemetry.ATTR_PRODUCT_ID, id),
 			attribute.Int("required.quantity", requiredQuantity),

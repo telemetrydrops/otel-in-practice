@@ -8,6 +8,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/services"
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -50,6 +51,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request body")
 		span.AddEvent("invalid_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -63,6 +65,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	user, err := h.service.RegisterUser(ctx, req.Email, req.Name, req.Tier)
 	if err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "user registration failed")
 		span.AddEvent("user_creation_failed", trace.WithAttributes(
 			attribute.String("user.email", req.Email),
 		))
@@ -88,6 +91,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	user, err := h.service.GetUser(ctx, userID)
 	if err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "user not found")
 		span.AddEvent("user_not_found", trace.WithAttributes(
 			attribute.String(telemetry.ATTR_USER_ID, userID),
 		))
@@ -119,6 +123,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	users, err := h.service.ListUsers(ctx, limit)
 	if err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to list users")
 		span.AddEvent("list_users_failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list users"})
 		return

@@ -30,6 +30,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 // Create inserts a new user into the database
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_INSERT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "INSERT"),
@@ -55,6 +56,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_SELECT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
@@ -74,6 +76,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 // GetByEmail retrieves a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_SELECT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
@@ -93,6 +96,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 // List retrieves all users with optional limit
 func (r *UserRepository) List(ctx context.Context, limit int) ([]*models.User, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_SELECT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),

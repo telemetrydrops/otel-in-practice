@@ -8,6 +8,9 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/services"
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -42,19 +45,30 @@ type CreateOrderRequest struct {
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Extract span from context
+	// Extract span from context (created by otelgin middleware)
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "order_creation"),
 	)
 
+	// Extract trace ID for log correlation and response headers
+	if spanCtx := span.SpanContext(); spanCtx.HasTraceID() {
+		c.Header("X-Trace-ID", spanCtx.TraceID().String())
+	}
+
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request body")
 		span.AddEvent("invalid_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Propagate payment method as baggage for downstream services
+	paymentMember, _ := baggage.NewMember(telemetry.BAGGAGE_PAYMENT_METHOD, req.PaymentMethod)
+	bag, _ := baggage.New(paymentMember)
+	ctx = baggage.ContextWithBaggage(ctx, bag)
 
 	span.SetAttributes(
 		attribute.String(telemetry.ATTR_USER_ID, req.UserID),
@@ -65,6 +79,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	order, err := h.service.CreateOrder(ctx, req.UserID, req.Items, req.PaymentMethod)
 	if err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "order creation failed")
 		span.AddEvent("order_creation_failed", trace.WithAttributes(
 			attribute.String(telemetry.ATTR_USER_ID, req.UserID),
 		))
@@ -95,6 +110,7 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	order, err := h.service.GetOrder(ctx, orderID)
 	if err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "order not found")
 		span.AddEvent("order_not_found", trace.WithAttributes(
 			attribute.String(telemetry.ATTR_ORDER_ID, orderID),
 		))
@@ -128,6 +144,7 @@ func (h *OrderHandler) GetUserOrders(c *gin.Context) {
 	orders, err := h.service.GetUserOrders(ctx, userID, limit)
 	if err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to get user orders")
 		span.AddEvent("get_user_orders_failed", trace.WithAttributes(
 			attribute.String(telemetry.ATTR_USER_ID, userID),
 		))
@@ -154,6 +171,7 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 	// Extract span from context
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
+		semconv.K8SClusterName("td-prod-1"),
 		attribute.String("business.operation", "order_status_update"),
 		attribute.String(telemetry.ATTR_ORDER_ID, orderID),
 	)
@@ -161,6 +179,7 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 	var req UpdateOrderStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request body")
 		span.AddEvent("invalid_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -172,6 +191,7 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 
 	if err := h.service.UpdateOrderStatus(ctx, orderID, req.Status); err != nil {
 		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to update order status")
 		span.AddEvent("status_update_failed", trace.WithAttributes(
 			attribute.String(telemetry.ATTR_ORDER_ID, orderID),
 		))

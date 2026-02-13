@@ -14,12 +14,26 @@ The baseline e-commerce monolith application.
 ### [stage-1-monolith](./stage-1-monolith)
 The instrumented version of the monolith.
 - **Status:** Fully instrumented with OpenTelemetry.
-- **Features:**
-  - Auto-instrumentation for Gin (HTTP) and GORM (Database).
-  - Manual instrumentation for business logic.
-  - Configuration-driven setup using `otelconf`.
-  - Structured logging with `otelzap`.
-- **Use Case:** Reference implementation to see how everything fits together.
+- **Tracing API coverage:**
+  - Starting spans and deferred `span.End()`
+  - Recovering spans from context (`trace.SpanFromContext`)
+  - Adding attributes (at creation and after)
+  - Span events (`span.AddEvent`)
+  - Error recording (`span.RecordError`) and span status (`span.SetStatus`)
+  - Span kind (`trace.WithSpanKind`) — CLIENT for DB calls, SERVER via middleware
+  - In-process context propagation via `ctx`
+  - Cross-process propagation setup (W3C TraceContext + Baggage)
+  - Baggage — setting and reading cross-cutting context
+  - Span links (`trace.WithLinks`) for async processing correlation
+  - Trace ID extraction for response headers and log correlation
+  - `span.IsRecording()` guard for expensive attribute computation
+  - Dynamic span names (`span.SetName()`)
+- **Also includes:**
+  - Configuration-driven setup using `otelconf`
+  - Custom business metrics (counters, histograms)
+  - Structured logging with `otelzap`
+  - Semantic conventions for database operations
+- **Use Case:** Reference implementation for the Traces API lesson. See each concept in context across handlers, services, and repositories.
 
 ## Prerequisites
 

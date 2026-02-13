@@ -6,7 +6,8 @@ It covers build instructions, testing procedures, and code style guidelines to e
 ## Project Structure
 
 The project is currently structured as a monorepo containing:
-- `stage-1-monolith/`: A Go-based e-commerce monolith application.
+- `stage-0-monolith/`: The uninstrumented baseline Go e-commerce monolith.
+- `stage-1-monolith/`: The fully instrumented version with comprehensive OpenTelemetry.
 - `local/`: Local development artifacts (git-ignored).
 - `specs/`: Documentation and specifications.
 
@@ -64,7 +65,7 @@ Adhere strictly to standard Go idioms and the existing project style.
 
 ### Formatting & Layout
 - **Tooling:** Always use `gofmt` (or `goimports`) to format code.
-- **Line Length:** specific hard limit, but keep lines readable (typically < 100-120 chars).
+- **Line Length:** No specific hard limit, but keep lines readable (typically < 100-120 chars).
 - **Indentation:** Use tabs for indentation, not spaces.
 
 ### Imports
@@ -89,7 +90,7 @@ Adhere strictly to standard Go idioms and the existing project style.
 - **General:** Use `CamelCase` for exported identifiers and `mixedCase` for unexported ones.
 - **Variables:** Use concise but descriptive names. `ctx` for Context, `err` for errors.
 - **Interfaces:** Single-method interfaces should end in "-er" (e.g., `Reader`, `Writer`).
-- **Packages:** specific, short, lowercase, single-word names. Avoid underscores.
+- **Packages:** Specific, short, lowercase, single-word names. Avoid underscores.
 
 ### Error Handling
 - **Check Errors:** Always check returned errors immediately.
@@ -104,16 +105,11 @@ Adhere strictly to standard Go idioms and the existing project style.
   logger.Error("Failed to process order", zap.Error(err))
   ```
 
-### Architecture & patterns
+### Architecture & Patterns
 - **Layered Architecture:** Respect the `handlers` -> `services` -> `repositories` -> `database` flow.
 - **Dependency Injection:** Pass dependencies (like repositories, loggers, config) via constructor functions (e.g., `NewUserService`).
 - **Context:** Always pass `context.Context` as the first argument to functions performing I/O or long-running operations.
 - **Configuration:** Use the `config` package to load settings. Do not hardcode values.
-
-### Observability
-- **OpenTelemetry:** Ensure new components are instrumented.
-- **Tracing:** Propagate context to maintain trace continuity.
-- **Logging:** Use structured logging with `zap`. key-value pairs for context (e.g., `zap.String("user_id", id)`).
 
 ### Types & Models
 - Use the `models` package for domain entities.
@@ -129,13 +125,78 @@ Adhere strictly to standard Go idioms and the existing project style.
 
 ### Comments
 - **Exported Code:** All exported functions, types, and constants must have a comment starting with the name of the identifier.
-- **Complexity:** specific explain *why* complex logic is implemented a certain way, not just *what* it does.
+- **Complexity:** Explain *why* complex logic is implemented a certain way, not just *what* it does.
 
-## 3. Workflow Rules
+## 3. Observability Guidelines
 
-- **Git:** Do not commit changes unless explicitly asked.
-- **Verification:** Always run `go build ./...` and `go test ./...` after making changes to ensure no regressions.
-- **Safety:** Verify file paths before reading/writing. Use `ls` to check directory existence.
+This section defines the tracing, metrics, and logging patterns used across the codebase. Follow these consistently when adding new code.
+
+### Tracer Initialization
+- Obtain a tracer via `otel.Tracer(telemetry.Scope)` and store it as a struct field.
+- The scope is defined in `telemetry/const.go` — use the same constant across all layers.
+
+### Starting Spans
+- Use `ctx, span := s.tracer.Start(ctx, "span name", ...)` and always `defer span.End()`.
+- Pass the **returned** context (not the original) to downstream calls to maintain parent-child relationships.
+- Provide known attributes at creation time via `trace.WithAttributes(...)` for efficiency.
+
+### Span Kind
+- **Repository/DB spans:** Always use `trace.WithSpanKind(trace.SpanKindClient)`.
+- **HTTP handler spans:** Created by `otelgin` middleware as `SpanKindServer` — do not create duplicate spans.
+- **Service spans:** Default to `SpanKindInternal` (no explicit kind needed).
+
+### Recovering Spans from Context
+- In handlers, use `span := trace.SpanFromContext(ctx)` to enrich the middleware-created span rather than creating a new one.
+
+### Attributes
+- Use constants from `telemetry/const.go` for attribute keys (e.g., `telemetry.ATTR_USER_ID`).
+- Follow semantic conventions for database attributes: `db.system`, `db.operation`, `db.sql.table`.
+- Add result-based attributes (like `result.count`) after the operation completes via `span.SetAttributes()`.
+
+### Events
+- Use `span.AddEvent("description", trace.WithAttributes(...))` to mark milestones within a span.
+- Events are for moments in time; attributes are for the span as a whole.
+
+### Error Recording
+- On error paths, always use **both**:
+  ```go
+  span.RecordError(err)                           // adds exception event with details
+  span.SetStatus(codes.Error, "short description") // marks span as failed
+  ```
+- `RecordError` alone does NOT mark the span as failed — `SetStatus` is required.
+- For expected conditions (e.g., not-found), `SetStatus` without `RecordError` is acceptable.
+
+### Baggage
+- Set baggage in handlers via `baggage.ContextWithBaggage(ctx, bag)`.
+- Read baggage in services via `baggage.FromContext(ctx)`.
+- Baggage key constants live in `telemetry/const.go` (e.g., `BAGGAGE_PAYMENT_METHOD`).
+- Do not put sensitive data in baggage — it travels in HTTP headers.
+
+### Span Links
+- Use `trace.WithLinks(trace.Link{SpanContext: ..., Attributes: ...})` to correlate spans across traces.
+- Combine with `trace.WithNewRoot()` for async operations that start a new trace but reference the trigger.
+
+### Trace ID Extraction
+- Use `span.SpanContext().TraceID().String()` when you need the trace ID for response headers or log correlation.
+
+### IsRecording Guard
+- Wrap expensive attribute computation in `if span.IsRecording() { ... }` to avoid wasted work when sampling is off.
+
+### Dynamic Span Names
+- Use `span.SetName()` when the final span name depends on runtime information (e.g., filtered vs. unfiltered query).
+
+### Metrics
+- Define metric instruments in constructor functions (e.g., `NewOrderService`).
+- Use constants from `telemetry/const.go` for metric names with UCUM-compliant units.
+- Record metrics with `metric.WithAttributes(...)` for dimensionality.
+
+### Logging
+- Use `zap.Logger` with structured fields.
+- The logger is bridged to OpenTelemetry via `otelzap` for log-trace correlation.
+
+### Telemetry Constants
+- All span names, attribute keys, metric names, and baggage keys are centralized in `internal/telemetry/const.go`.
+- Add new constants there rather than using inline strings.
 
 ## 4. Specific Libraries
 
@@ -143,5 +204,15 @@ Adhere strictly to standard Go idioms and the existing project style.
 - **ORM:** GORM (`gorm.io/gorm`)
 - **Logging:** Zap (`go.uber.org/zap`)
 - **Instrumentation:** OpenTelemetry (`go.opentelemetry.io/otel`)
+- **HTTP Middleware:** otelgin (`go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin`)
+- **Log Bridge:** otelzap (`go.opentelemetry.io/contrib/bridges/otelzap`)
+- **Configuration:** otelconf (`go.opentelemetry.io/contrib/otelconf`)
+
+## 5. Workflow Rules
+
+- **Git:** Do not commit changes unless explicitly asked.
+- **Verification:** Always run `go build ./...` and `go test ./...` after making changes to ensure no regressions.
+- **Safety:** Verify file paths before reading/writing. Use `ls` to check directory existence.
+- **Formatting:** Run `go fmt ./...` after modifying Go code.
 
 End of Guidelines.

@@ -11,6 +11,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -74,6 +75,7 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 		// Handle duplicate email specifically (atomic check)
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "already exists") {
 			span.AddEvent("user already exists (atomic check)")
+			span.SetStatus(codes.Error, "duplicate email")
 			return nil, fmt.Errorf("user with email %s already exists", email)
 		}
 
@@ -81,7 +83,7 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 		if errors.Is(err, context.Canceled) {
 			s.logger.Warn("Context canceled during user creation, checking for phantom success",
 				zap.String("email", email))
-			
+
 			// Use background context for the check since the request context is dead
 			phantomUser, phantomErr := s.repo.GetByEmail(context.Background(), email)
 			if phantomErr == nil && phantomUser != nil {
@@ -93,6 +95,8 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 			}
 		}
 
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "user creation failed")
 		return nil, fmt.Errorf("creating user: %w", err)
 	}
 
@@ -125,8 +129,11 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, err
 	user, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			span.SetStatus(codes.Error, "user not found")
 			return nil, fmt.Errorf("user not found: %s", id)
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "user retrieval failed")
 		return nil, fmt.Errorf("getting user: %w", err)
 	}
 
@@ -147,6 +154,8 @@ func (s *UserService) ListUsers(ctx context.Context, limit int) ([]*models.User,
 
 	users, err := s.repo.List(ctx, limit)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "user listing failed")
 		return nil, fmt.Errorf("listing users: %w", err)
 	}
 

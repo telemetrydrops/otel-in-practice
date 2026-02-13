@@ -11,6 +11,8 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -79,6 +81,14 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 			))
 	}()
 
+	// Read baggage propagated from the handler
+	bag := baggage.FromContext(ctx)
+	if pm := bag.Member(telemetry.BAGGAGE_PAYMENT_METHOD); pm.Value() != "" {
+		span.AddEvent("baggage received", trace.WithAttributes(
+			attribute.String("baggage.payment.method", pm.Value()),
+		))
+	}
+
 	s.logger.Info("Processing order",
 		zap.String("user_id", userID),
 		zap.Int("items", len(items)))
@@ -86,6 +96,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	// Verify user exists
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "user not found")
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
 	span.SetAttributes(attribute.String(telemetry.ATTR_CUSTOMER_TIER, user.Tier))
@@ -98,15 +110,20 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 		// Check product availability
 		product, err := s.productRepo.GetByID(ctx, item.ProductID)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "product not found")
 			return nil, fmt.Errorf("product %s not found: %w", item.ProductID, err)
 		}
 
 		// Check inventory
 		hasStock, err := s.productRepo.CheckStock(ctx, item.ProductID, item.Quantity)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "stock check failed")
 			return nil, fmt.Errorf("checking stock for product %s: %w", item.ProductID, err)
 		}
 		if !hasStock {
+			span.SetStatus(codes.Error, "insufficient stock")
 			return nil, fmt.Errorf("insufficient stock for product %s", item.ProductID)
 		}
 
@@ -120,6 +137,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 
 		// Update inventory
 		if err := s.productRepo.UpdateStock(ctx, item.ProductID, -item.Quantity); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "stock update failed")
 			return nil, fmt.Errorf("updating stock for product %s: %w", item.ProductID, err)
 		}
 	}
@@ -135,6 +154,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 
 	span.AddEvent("creating order in database")
 	if err := s.orderRepo.Create(ctx, order); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "order creation failed")
 		// Rollback inventory changes would go here in production
 		return nil, fmt.Errorf("creating order: %w", err)
 	}
@@ -145,7 +166,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	)
 
 	// Deliberately leak a goroutine for exercise (background processing simulation)
-	s.startBackgroundProcessing(order.ID)
+	// Pass span context so background processing can link back to this trace
+	s.startBackgroundProcessing(order.ID, span.SpanContext())
 
 	span.AddEvent("order created successfully")
 	s.logger.Info("Order created successfully",
@@ -155,10 +177,28 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	return order, nil
 }
 
-// startBackgroundProcessing deliberately creates a goroutine leak for the exercise
-func (s *OrderService) startBackgroundProcessing(orderID string) {
+// startBackgroundProcessing deliberately creates a goroutine leak for the exercise.
+// It uses span links to correlate the background work with the original order trace.
+func (s *OrderService) startBackgroundProcessing(orderID string, triggerSpanCtx trace.SpanContext) {
 	s.goroutineLeaker.wg.Add(1)
 	go func() {
+		// Start a new root span linked back to the order creation span.
+		// This is the canonical pattern for async processing: new trace, linked to trigger.
+		_, bgSpan := s.tracer.Start(context.Background(), "order background processing",
+			trace.WithNewRoot(),
+			trace.WithLinks(trace.Link{
+				SpanContext: triggerSpanCtx,
+				Attributes: []attribute.KeyValue{
+					attribute.String("link.reason", "triggered_by_order_creation"),
+				},
+			}),
+			trace.WithAttributes(
+				attribute.String(telemetry.ATTR_ORDER_ID, orderID),
+			),
+		)
+		bgSpan.AddEvent("background processing started")
+		bgSpan.End()
+
 		// Deliberate bug: No defer wg.Done() and no context cancellation
 		// This goroutine will leak and run forever
 		ticker := time.NewTicker(10 * time.Second)
@@ -180,6 +220,8 @@ func (s *OrderService) GetOrder(ctx context.Context, orderID string) (*models.Or
 
 	order, err := s.orderRepo.GetByID(ctx, orderID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "order retrieval failed")
 		return nil, fmt.Errorf("getting order: %w", err)
 	}
 
@@ -203,6 +245,8 @@ func (s *OrderService) GetUserOrders(ctx context.Context, userID string, limit i
 
 	orders, err := s.orderRepo.ListByUserID(ctx, userID, limit)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to list user orders")
 		return nil, fmt.Errorf("getting user orders: %w", err)
 	}
 
@@ -227,10 +271,13 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, orderID, status st
 	}
 
 	if !validStatuses[status] {
+		span.SetStatus(codes.Error, "invalid order status")
 		return fmt.Errorf("invalid order status: %s", status)
 	}
 
 	if err := s.orderRepo.UpdateStatus(ctx, orderID, status); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "status update failed")
 		return fmt.Errorf("updating order status: %w", err)
 	}
 

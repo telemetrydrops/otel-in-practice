@@ -30,6 +30,7 @@ func NewOrderRepository(db *gorm.DB) *OrderRepository {
 // Create inserts a new order into the database
 func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_ORDER_INSERT,
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "INSERT"),
@@ -77,6 +78,7 @@ func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error
 // GetByID retrieves an order by ID with its items
 func (r *OrderRepository) GetByID(ctx context.Context, id string) (*models.Order, error) {
 	ctx, span := r.tracer.Start(ctx, "SELECT orders",
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
@@ -96,6 +98,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*models.Order
 // ListByUserID retrieves orders for a specific user
 func (r *OrderRepository) ListByUserID(ctx context.Context, userID string, limit int) ([]*models.Order, error) {
 	ctx, span := r.tracer.Start(ctx, "SELECT orders",
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
@@ -123,6 +126,7 @@ func (r *OrderRepository) ListByUserID(ctx context.Context, userID string, limit
 // UpdateStatus updates the status of an order
 func (r *OrderRepository) UpdateStatus(ctx context.Context, id string, status string) error {
 	ctx, span := r.tracer.Start(ctx, "UPDATE orders",
+		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "UPDATE"),
