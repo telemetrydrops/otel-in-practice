@@ -28,7 +28,9 @@ const (
 const (
 	USER_REGISTRATIONS_TOTAL  = "users.registrations.total"
 	ORDER_PROCESSING_DURATION = "orders.processing.duration"
+	ORDERS_ACTIVE             = "orders.active"
 	PRODUCT_LOOKUPS_TOTAL     = "products.lookups.total"
+	PRODUCTS_INVENTORY_VALUE  = "products.inventory.value"
 	HTTP_REQUEST_DURATION     = "http.server.request.duration"
 )
 

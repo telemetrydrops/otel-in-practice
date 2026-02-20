@@ -38,12 +38,35 @@ func NewProductService(repo *repositories.ProductRepository, logger *zap.Logger)
 		return nil, fmt.Errorf("creating lookup counter: %w", err)
 	}
 
-	return &ProductService{
+	svc := &ProductService{
 		repo:          repo,
 		logger:        logger,
 		tracer:        otel.Tracer(telemetry.Scope),
 		lookupCounter: lookupCounter,
-	}, nil
+	}
+
+	// Register an observable gauge with a callback.
+	// The SDK calls this function on each metric collection interval.
+	inventoryGauge, err := meter.Float64ObservableGauge(
+		telemetry.PRODUCTS_INVENTORY_VALUE,
+		metric.WithDescription("Total value of products currently in stock"),
+		metric.WithUnit("USD"),
+		metric.WithFloat64Callback(func(_ context.Context, o metric.Float64Observer) error {
+			value, err := repo.GetTotalInventoryValue(context.Background())
+			if err != nil {
+				logger.Warn("Failed to read inventory value for metric", zap.Error(err))
+				return nil
+			}
+			o.Observe(value)
+			return nil
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating inventory gauge: %w", err)
+	}
+	svc.inventoryGauge = inventoryGauge
+
+	return svc, nil
 }
 
 // GetProduct retrieves a product by ID

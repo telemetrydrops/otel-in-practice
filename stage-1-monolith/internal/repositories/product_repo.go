@@ -141,6 +141,18 @@ func (r *ProductRepository) UpdateStock(ctx context.Context, id string, quantity
 	return nil
 }
 
+// GetTotalInventoryValue returns the total value of all products in stock (sum of stock * price)
+func (r *ProductRepository) GetTotalInventoryValue(ctx context.Context) (float64, error) {
+	var total float64
+	err := r.db.WithContext(ctx).Model(&models.Product{}).
+		Select("COALESCE(SUM(stock * price), 0)").
+		Scan(&total).Error
+	if err != nil {
+		return 0, fmt.Errorf("calculating inventory value: %w", err)
+	}
+	return total, nil
+}
+
 // CheckStock verifies if a product has sufficient stock
 func (r *ProductRepository) CheckStock(ctx context.Context, id string, requiredQuantity int) (bool, error) {
 	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_INVENTORY_CHECK,

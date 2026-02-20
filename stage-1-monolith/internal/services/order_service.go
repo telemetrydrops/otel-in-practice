@@ -26,6 +26,7 @@ type OrderService struct {
 	logger          *zap.Logger
 	tracer          trace.Tracer
 	processingHist  metric.Float64Histogram
+	activeOrders    metric.Int64UpDownCounter
 	goroutineLeaker *goroutineLeaker // For exercise: goroutine leak
 }
 
@@ -46,9 +47,19 @@ func NewOrderService(
 		telemetry.ORDER_PROCESSING_DURATION,
 		metric.WithDescription("Duration of order processing"),
 		metric.WithUnit("ms"),
+		metric.WithExplicitBucketBoundaries(5, 10, 25, 50, 100, 250, 500, 1000, 2500),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating processing histogram: %w", err)
+	}
+
+	activeOrders, err := meter.Int64UpDownCounter(
+		telemetry.ORDERS_ACTIVE,
+		metric.WithDescription("Number of orders currently being processed"),
+		metric.WithUnit("{orders}"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating active orders counter: %w", err)
 	}
 
 	return &OrderService{
@@ -58,6 +69,7 @@ func NewOrderService(
 		logger:          logger,
 		tracer:          otel.Tracer(telemetry.Scope),
 		processingHist:  processingHist,
+		activeOrders:    activeOrders,
 		goroutineLeaker: &goroutineLeaker{},
 	}, nil
 }
@@ -72,7 +84,17 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 			attribute.Int("items.count", len(items)),
 		))
 	defer span.End()
+
+	// Track active orders: increment now, decrement when done
+	s.activeOrders.Add(ctx, 1,
+		metric.WithAttributes(
+			attribute.String(telemetry.ATTR_PAYMENT_METHOD, paymentMethod),
+		))
 	defer func() {
+		s.activeOrders.Add(ctx, -1,
+			metric.WithAttributes(
+				attribute.String(telemetry.ATTR_PAYMENT_METHOD, paymentMethod),
+			))
 		// Record processing duration
 		duration := float64(time.Since(startTime).Milliseconds())
 		s.processingHist.Record(ctx, duration,
