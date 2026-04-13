@@ -56,7 +56,7 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 	defer span.End()
 
 	s.logger.Info("Starting user registration",
-		zap.String("email", email),
+		zap.String("email_hash", telemetry.HashEmail(email)),
 		zap.String("tier", tier))
 
 	// Create new user
@@ -82,14 +82,14 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 		// Handle context cancellation (phantom success detection)
 		if errors.Is(err, context.Canceled) {
 			s.logger.Warn("Context canceled during user creation, checking for phantom success",
-				zap.String("email", email))
+				zap.String("email_hash", telemetry.HashEmail(email)))
 
 			// Use background context for the check since the request context is dead
 			phantomUser, phantomErr := s.repo.GetByEmail(context.Background(), email)
 			if phantomErr == nil && phantomUser != nil {
 				s.logger.Info("Phantom success detected: user was created despite context cancellation",
 					zap.String("user_id", phantomUser.ID),
-					zap.String("email", email))
+					zap.String("email_hash", telemetry.HashEmail(email)))
 				user = phantomUser
 				goto success
 			}
@@ -113,7 +113,7 @@ success:
 
 	s.logger.Info("User registered successfully",
 		zap.String("user_id", user.ID),
-		zap.String("email", email))
+		zap.String("email_hash", telemetry.HashEmail(email)))
 
 	return user, nil
 }
