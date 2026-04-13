@@ -9,6 +9,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
@@ -143,13 +144,26 @@ func (r *ProductRepository) UpdateStock(ctx context.Context, id string, quantity
 
 // GetTotalInventoryValue returns the total value of all products in stock (sum of stock * price)
 func (r *ProductRepository) GetTotalInventoryValue(ctx context.Context) (float64, error) {
+	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_INVENTORY_VALUE_CALC,
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			attribute.String("db.system", "postgresql"),
+			attribute.String("db.operation", "SELECT"),
+			attribute.String("db.sql.table", "products"),
+		))
+	defer span.End()
+
 	var total float64
 	err := r.db.WithContext(ctx).Model(&models.Product{}).
 		Select("COALESCE(SUM(stock * price), 0)").
 		Scan(&total).Error
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "calculating inventory value")
 		return 0, fmt.Errorf("calculating inventory value: %w", err)
 	}
+
+	span.SetAttributes(attribute.Float64("inventory.value", total))
 	return total, nil
 }
 
