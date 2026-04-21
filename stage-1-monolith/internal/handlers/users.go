@@ -58,7 +58,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	span.SetAttributes(
-		attribute.String("user.email", req.Email),
+		attribute.String("user.email_hash", telemetry.HashEmail(req.Email)),
 		attribute.String(telemetry.ATTR_CUSTOMER_TIER, req.Tier),
 	)
 
@@ -67,7 +67,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "user registration failed")
 		span.AddEvent("user_creation_failed", trace.WithAttributes(
-			attribute.String("user.email", req.Email),
+			attribute.String("user.email_hash", telemetry.HashEmail(req.Email)),
 		))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return

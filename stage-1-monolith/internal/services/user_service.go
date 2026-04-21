@@ -50,7 +50,7 @@ func NewUserService(repo *repositories.UserRepository, logger *zap.Logger) (*Use
 func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string) (*models.User, error) {
 	ctx, span := s.tracer.Start(ctx, telemetry.SPAN_USER_REGISTRATION,
 		trace.WithAttributes(
-			attribute.String("user.email", email),
+			attribute.String("user.email_hash", telemetry.HashEmail(email)),
 			attribute.String(telemetry.ATTR_CUSTOMER_TIER, tier),
 		))
 	defer span.End()
@@ -76,7 +76,7 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "already exists") {
 			span.AddEvent("user already exists (atomic check)")
 			span.SetStatus(codes.Error, "duplicate email")
-			return nil, fmt.Errorf("user with email %s already exists", email)
+			return nil, fmt.Errorf("user with email_hash %s already exists", telemetry.HashEmail(email))
 		}
 
 		// Handle context cancellation (phantom success detection)

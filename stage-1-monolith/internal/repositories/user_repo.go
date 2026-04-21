@@ -81,7 +81,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 			attribute.String("db.system", "postgresql"),
 			attribute.String("db.operation", "SELECT"),
 			attribute.String("db.sql.table", "users"),
-			attribute.String("user.email", email),
+			attribute.String("user.email_hash", telemetry.HashEmail(email)),
 		))
 	defer span.End()
 
