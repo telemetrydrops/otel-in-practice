@@ -85,7 +85,7 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 				zap.String("email_hash", telemetry.HashEmail(email)))
 
 			// Use background context for the check since the request context is dead
-			phantomUser, phantomErr := s.repo.GetByEmail(context.Background(), email)
+			phantomUser, phantomErr := s.repo.GetByEmail(context.WithoutCancel(ctx), email)
 			if phantomErr == nil && phantomUser != nil {
 				s.logger.Info("Phantom success detected: user was created despite context cancellation",
 					zap.String("user_id", phantomUser.ID),
