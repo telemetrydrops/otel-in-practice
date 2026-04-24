@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
-	otelconf "go.opentelemetry.io/contrib/otelconf/v0.3.0"
+	"go.opentelemetry.io/contrib/otelconf"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/log/global"
@@ -27,6 +27,7 @@ type Providers struct {
 	TracerProvider trace.TracerProvider
 	MeterProvider  metric.MeterProvider
 	LoggerProvider log.LoggerProvider
+	Propagator     propagation.TextMapPropagator
 	Logger         *slog.Logger
 	Closer         func(ctx context.Context) error
 }
@@ -42,12 +43,7 @@ func SetupTelemetry(ctx context.Context, serviceName, version, configFile string
 	otel.SetTracerProvider(providers.TracerProvider)
 	otel.SetMeterProvider(providers.MeterProvider)
 	global.SetLoggerProvider(providers.LoggerProvider)
-
-	// Set up context propagation, needed until this is fixed: https://github.com/open-telemetry/opentelemetry-go-contrib/issues/6712
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
+	otel.SetTextMapPropagator(providers.Propagator)
 
 	return providers, nil
 }
@@ -65,6 +61,7 @@ func providersFromConfig(ctx context.Context, scope, version, cfgFile string) (*
 				TracerProvider: tracenoop.NewTracerProvider(),
 				MeterProvider:  metricnoop.NewMeterProvider(),
 				LoggerProvider: noop.NewLoggerProvider(),
+				Propagator:     propagation.NewCompositeTextMapPropagator(),
 				Logger:         logger,
 				Closer:         func(ctx context.Context) error { return nil },
 			}, nil
@@ -72,24 +69,14 @@ func providersFromConfig(ctx context.Context, scope, version, cfgFile string) (*
 		return nil, fmt.Errorf("failed to read config file %s: %w", cfgFile, err)
 	}
 
-	// Expand environment variables in config
-	b = []byte(os.ExpandEnv(string(b)))
-
-	// Parse OpenTelemetry configuration
 	conf, err := otelconf.ParseYAML(b)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set resource attributes
 	if conf.Resource == nil {
 		conf.Resource = &otelconf.Resource{}
 	}
-	if conf.Resource.Attributes == nil {
-		conf.Resource.Attributes = []otelconf.AttributeNameValue{}
-	}
-
-	// Add service metadata
 	conf.Resource.Attributes = insertAttribute(conf.Resource.Attributes,
 		string(semconv.ServiceVersionKey), version)
 	conf.Resource.Attributes = insertAttribute(conf.Resource.Attributes,
@@ -114,6 +101,7 @@ func providersFromConfig(ctx context.Context, scope, version, cfgFile string) (*
 		TracerProvider: sdk.TracerProvider(),
 		MeterProvider:  sdk.MeterProvider(),
 		LoggerProvider: sdk.LoggerProvider(),
+		Propagator:     sdk.Propagator(),
 		Logger:         logger,
 		Closer:         sdk.Shutdown,
 	}, nil
