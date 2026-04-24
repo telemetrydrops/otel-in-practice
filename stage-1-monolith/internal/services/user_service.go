@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/models"
@@ -14,20 +15,19 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 // UserService handles user business logic
 type UserService struct {
 	repo                *repositories.UserRepository
-	logger              *zap.Logger
+	logger              *slog.Logger
 	tracer              trace.Tracer
 	registrationCounter metric.Int64Counter
 }
 
 // NewUserService creates a new user service
-func NewUserService(repo *repositories.UserRepository, logger *zap.Logger) (*UserService, error) {
+func NewUserService(repo *repositories.UserRepository, logger *slog.Logger) (*UserService, error) {
 	meter := otel.Meter(telemetry.Scope)
 	registrationCounter, err := meter.Int64Counter(
 		telemetry.USER_REGISTRATIONS_TOTAL,
@@ -55,9 +55,9 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 		))
 	defer span.End()
 
-	s.logger.Info("Starting user registration",
-		zap.String("email_hash", telemetry.HashEmail(email)),
-		zap.String("tier", tier))
+	s.logger.InfoContext(ctx, "Starting user registration",
+		"email_hash", telemetry.HashEmail(email),
+		"tier", tier)
 
 	// Create new user
 	user := &models.User{
@@ -81,15 +81,15 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 
 		// Handle context cancellation (phantom success detection)
 		if errors.Is(err, context.Canceled) {
-			s.logger.Warn("Context canceled during user creation, checking for phantom success",
-				zap.String("email_hash", telemetry.HashEmail(email)))
+			s.logger.WarnContext(ctx, "Context canceled during user creation, checking for phantom success",
+				"email_hash", telemetry.HashEmail(email))
 
 			// Use background context for the check since the request context is dead
 			phantomUser, phantomErr := s.repo.GetByEmail(context.Background(), email)
 			if phantomErr == nil && phantomUser != nil {
-				s.logger.Info("Phantom success detected: user was created despite context cancellation",
-					zap.String("user_id", phantomUser.ID),
-					zap.String("email_hash", telemetry.HashEmail(email)))
+				s.logger.InfoContext(ctx, "Phantom success detected: user was created despite context cancellation",
+					"user_id", phantomUser.ID,
+					"email_hash", telemetry.HashEmail(email))
 				user = phantomUser
 				goto success
 			}
@@ -111,9 +111,9 @@ success:
 	span.SetAttributes(attribute.String(telemetry.ATTR_USER_ID, user.ID))
 	telemetry.EmitEvent(ctx, "user registered successfully")
 
-	s.logger.Info("User registered successfully",
-		zap.String("user_id", user.ID),
-		zap.String("email_hash", telemetry.HashEmail(email)))
+	s.logger.InfoContext(ctx, "User registered successfully",
+		"user_id", user.ID,
+		"email_hash", telemetry.HashEmail(email))
 
 	return user, nil
 }

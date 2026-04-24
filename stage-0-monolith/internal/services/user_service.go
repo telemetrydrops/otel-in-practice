@@ -4,22 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/models"
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/repositories"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 // UserService handles user business logic
 type UserService struct {
 	repo   *repositories.UserRepository
-	logger *zap.Logger
+	logger *slog.Logger
 }
 
 // NewUserService creates a new user service
-func NewUserService(repo *repositories.UserRepository, logger *zap.Logger) (*UserService, error) {
+func NewUserService(repo *repositories.UserRepository, logger *slog.Logger) (*UserService, error) {
 	return &UserService{
 		repo:   repo,
 		logger: logger,
@@ -28,9 +28,9 @@ func NewUserService(repo *repositories.UserRepository, logger *zap.Logger) (*Use
 
 // RegisterUser creates a new user account
 func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string) (*models.User, error) {
-	s.logger.Info("Starting user registration",
-		zap.String("email", email),
-		zap.String("tier", tier))
+	s.logger.InfoContext(ctx, "Starting user registration",
+		"email", email,
+		"tier", tier)
 
 	// Create new user
 	user := &models.User{
@@ -51,15 +51,15 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 
 		// Handle context cancellation (phantom success detection)
 		if errors.Is(err, context.Canceled) {
-			s.logger.Warn("Context canceled during user creation, checking for phantom success",
-				zap.String("email", email))
+			s.logger.WarnContext(ctx, "Context canceled during user creation, checking for phantom success",
+				"email", email)
 
 			// Use background context for the check since the request context is dead
 			phantomUser, phantomErr := s.repo.GetByEmail(context.Background(), email)
 			if phantomErr == nil && phantomUser != nil {
-				s.logger.Info("Phantom success detected: user was created despite context cancellation",
-					zap.String("user_id", phantomUser.ID),
-					zap.String("email", email))
+				s.logger.InfoContext(ctx, "Phantom success detected: user was created despite context cancellation",
+					"user_id", phantomUser.ID,
+					"email", email)
 				user = phantomUser
 				goto success
 			}
@@ -69,9 +69,9 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 	}
 
 success:
-	s.logger.Info("User registered successfully",
-		zap.String("user_id", user.ID),
-		zap.String("email", email))
+	s.logger.InfoContext(ctx, "User registered successfully",
+		"user_id", user.ID,
+		"email", email)
 
 	return user, nil
 }

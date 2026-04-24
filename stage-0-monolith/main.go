@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,7 +18,6 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/models"
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/repositories"
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/services"
-	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -36,32 +36,31 @@ func main() {
 	}
 
 	// Initialize Logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-	defer logger.Sync()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
 
 	logger.Info("Starting ecommerce-monolith application",
-		zap.String("version", version),
-		zap.String("commit", commit),
-		zap.String("build_date", date),
-		zap.String("server_address", cfg.GetServerAddress()))
+		"version", version,
+		"commit", commit,
+		"build_date", date,
+		"server_address", cfg.GetServerAddress())
 
 	// Initialize database
 	db, err := initDatabase(cfg, logger)
 	if err != nil {
-		logger.Fatal("Failed to initialize database", zap.Error(err))
+		logger.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 
 	// Run migrations
 	if err := runMigrations(db); err != nil {
-		logger.Fatal("Failed to run migrations", zap.Error(err))
+		logger.Error("Failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 
 	// Seed initial data
 	if err := seedData(db, logger); err != nil {
-		logger.Warn("Failed to seed data", zap.Error(err))
+		logger.Warn("Failed to seed data", "error", err)
 	}
 
 	// Initialize repositories
@@ -72,17 +71,20 @@ func main() {
 	// Initialize services
 	userService, err := services.NewUserService(userRepo, logger)
 	if err != nil {
-		logger.Fatal("Failed to create user service", zap.Error(err))
+		logger.Error("Failed to create user service", "error", err)
+		os.Exit(1)
 	}
 
 	productService, err := services.NewProductService(productRepo, logger)
 	if err != nil {
-		logger.Fatal("Failed to create product service", zap.Error(err))
+		logger.Error("Failed to create product service", "error", err)
+		os.Exit(1)
 	}
 
 	orderService, err := services.NewOrderService(orderRepo, productRepo, userRepo, logger)
 	if err != nil {
-		logger.Fatal("Failed to create order service", zap.Error(err))
+		logger.Error("Failed to create order service", "error", err)
+		os.Exit(1)
 	}
 
 	// Initialize handlers
@@ -95,11 +97,12 @@ func main() {
 
 	// Start server
 	if err := runServer(cfg, app, logger); err != nil {
-		logger.Fatal("Server failed", zap.Error(err))
+		logger.Error("Server failed", "error", err)
+		os.Exit(1)
 	}
 }
 
-func initDatabase(cfg *config.Config, logger *zap.Logger) (*gorm.DB, error) {
+func initDatabase(cfg *config.Config, logger *slog.Logger) (*gorm.DB, error) {
 	dsn := cfg.GetDatabaseDSN()
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -108,9 +111,9 @@ func initDatabase(cfg *config.Config, logger *zap.Logger) (*gorm.DB, error) {
 	}
 
 	logger.Info("Database connection established",
-		zap.String("host", cfg.Database.PostgreSQL.Host),
-		zap.Int("port", cfg.Database.PostgreSQL.Port),
-		zap.String("database", cfg.Database.PostgreSQL.Database))
+		"host", cfg.Database.PostgreSQL.Host,
+		"port", cfg.Database.PostgreSQL.Port,
+		"database", cfg.Database.PostgreSQL.Database)
 	return db, nil
 }
 
@@ -123,7 +126,7 @@ func runMigrations(db *gorm.DB) error {
 	)
 }
 
-func seedData(db *gorm.DB, logger *zap.Logger) error {
+func seedData(db *gorm.DB, logger *slog.Logger) error {
 	// Check if data already exists
 	var count int64
 	db.Model(&models.Product{}).Count(&count)
@@ -191,7 +194,7 @@ func setupHTTPServer(
 	userHandler *handlers.UserHandler,
 	productHandler *handlers.ProductHandler,
 	orderHandler *handlers.OrderHandler,
-	logger *zap.Logger,
+	logger *slog.Logger,
 ) *gin.Engine {
 	// Set Gin mode based on configuration
 	switch cfg.Server.Mode {
@@ -225,7 +228,7 @@ func setupHTTPServer(
 	return router
 }
 
-func runServer(cfg *config.Config, handler http.Handler, logger *zap.Logger) error {
+func runServer(cfg *config.Config, handler http.Handler, logger *slog.Logger) error {
 	// Parse timeout values from config
 	readTimeout, _ := time.ParseDuration(cfg.Server.ReadTimeout)
 	writeTimeout, _ := time.ParseDuration(cfg.Server.WriteTimeout)
@@ -252,9 +255,10 @@ func runServer(cfg *config.Config, handler http.Handler, logger *zap.Logger) err
 
 	// Start server in goroutine
 	go func() {
-		logger.Info("HTTP server starting", zap.String("address", server.Addr))
+		logger.Info("HTTP server starting", "address", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed to start", zap.Error(err))
+			logger.Error("Server failed to start", "error", err)
+			os.Exit(1)
 		}
 	}()
 

@@ -4,21 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/models"
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/repositories"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 // ProductService handles product business logic
 type ProductService struct {
 	repo   *repositories.ProductRepository
-	logger *zap.Logger
+	logger *slog.Logger
 }
 
 // NewProductService creates a new product service
-func NewProductService(repo *repositories.ProductRepository, logger *zap.Logger) (*ProductService, error) {
+func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger) (*ProductService, error) {
 	return &ProductService{
 		repo:   repo,
 		logger: logger,
@@ -40,9 +40,9 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 
 // ListProducts retrieves products with optional filters
 func (s *ProductService) ListProducts(ctx context.Context, category string, limit int) ([]*models.Product, error) {
-	s.logger.Info("Listing products",
-		zap.String("category", category),
-		zap.Int("limit", limit))
+	s.logger.InfoContext(ctx, "Listing products",
+		"category", category,
+		"limit", limit)
 
 	products, err := s.repo.List(ctx, category, limit)
 	if err != nil {
@@ -66,9 +66,9 @@ func (s *ProductService) CreateProduct(ctx context.Context, product *models.Prod
 		return fmt.Errorf("creating product: %w", err)
 	}
 
-	s.logger.Info("Product created",
-		zap.String("product_id", product.ID),
-		zap.String("name", product.Name))
+	s.logger.InfoContext(ctx, "Product created",
+		"product_id", product.ID,
+		"name", product.Name)
 
 	return nil
 }
@@ -81,9 +81,9 @@ func (s *ProductService) CheckInventory(ctx context.Context, productID string, q
 	}
 
 	if !hasStock {
-		s.logger.Warn("Insufficient inventory",
-			zap.String("product_id", productID),
-			zap.Int("requested", quantity))
+		s.logger.WarnContext(ctx, "Insufficient inventory",
+			"product_id", productID,
+			"requested", quantity)
 	}
 
 	return hasStock, nil
