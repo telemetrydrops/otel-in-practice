@@ -9,6 +9,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
@@ -47,8 +48,8 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 		return fmt.Errorf("creating user: %w", err)
 	}
 
-	span.AddEvent("user created in database",
-		trace.WithAttributes(attribute.String(telemetry.ATTR_USER_ID, user.ID)))
+	telemetry.EmitEvent(ctx, "user created in database",
+		log.String(telemetry.ATTR_USER_ID, user.ID))
 
 	return nil
 }

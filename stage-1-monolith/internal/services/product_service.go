@@ -83,7 +83,7 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 			span.SetStatus(codes.Error, "product not found")
 			return nil, fmt.Errorf("product not found: %s", id)
 		}
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "product retrieval failed")
 		return nil, fmt.Errorf("getting product: %w", err)
 	}
@@ -126,7 +126,7 @@ func (s *ProductService) ListProducts(ctx context.Context, category string, limi
 
 	products, err := s.repo.List(ctx, category, limit)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "product listing failed")
 		return nil, fmt.Errorf("listing products: %w", err)
 	}
@@ -156,13 +156,13 @@ func (s *ProductService) CreateProduct(ctx context.Context, product *models.Prod
 	}
 
 	if err := s.repo.Create(ctx, product); err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "product creation failed")
 		return fmt.Errorf("creating product: %w", err)
 	}
 
 	span.SetAttributes(attribute.String(telemetry.ATTR_PRODUCT_ID, product.ID))
-	span.AddEvent("product created successfully")
+	telemetry.EmitEvent(ctx, "product created successfully")
 
 	s.logger.Info("Product created",
 		zap.String("product_id", product.ID),
@@ -182,7 +182,7 @@ func (s *ProductService) CheckInventory(ctx context.Context, productID string, q
 
 	hasStock, err := s.repo.CheckStock(ctx, productID, quantity)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "inventory check failed")
 		return false, fmt.Errorf("checking inventory: %w", err)
 	}
@@ -190,7 +190,7 @@ func (s *ProductService) CheckInventory(ctx context.Context, productID string, q
 	span.SetAttributes(attribute.Bool("inventory.available", hasStock))
 
 	if !hasStock {
-		span.AddEvent("insufficient inventory")
+		telemetry.EmitEvent(ctx, "insufficient inventory")
 		s.logger.Warn("Insufficient inventory",
 			zap.String("product_id", productID),
 			zap.Int("requested", quantity))
@@ -209,11 +209,11 @@ func (s *ProductService) UpdateStock(ctx context.Context, productID string, quan
 	defer span.End()
 
 	if err := s.repo.UpdateStock(ctx, productID, quantityChange); err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "stock update failed")
 		return fmt.Errorf("updating stock: %w", err)
 	}
 
-	span.AddEvent("stock updated successfully")
+	telemetry.EmitEvent(ctx, "stock updated successfully")
 	return nil
 }

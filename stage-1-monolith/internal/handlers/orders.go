@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/log"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -58,9 +59,8 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		span.RecordError(err)
 		span.SetStatus(codes.Error, "invalid request body")
-		span.AddEvent("invalid_request")
+		telemetry.EmitEvent(ctx, "invalid_request", log.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -78,11 +78,11 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	order, err := h.service.CreateOrder(ctx, req.UserID, req.Items, req.PaymentMethod)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "order creation failed")
-		span.AddEvent("order_creation_failed", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_USER_ID, req.UserID),
-		))
+		telemetry.EmitEvent(ctx, "order_creation_failed",
+			log.String(telemetry.ATTR_USER_ID, req.UserID),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -109,11 +109,11 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 
 	order, err := h.service.GetOrder(ctx, orderID)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "order not found")
-		span.AddEvent("order_not_found", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_ORDER_ID, orderID),
-		))
+		telemetry.EmitEvent(ctx, "order_not_found",
+			log.String(telemetry.ATTR_ORDER_ID, orderID),
+		)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
@@ -143,11 +143,11 @@ func (h *OrderHandler) GetUserOrders(c *gin.Context) {
 
 	orders, err := h.service.GetUserOrders(ctx, userID, limit)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "failed to get user orders")
-		span.AddEvent("get_user_orders_failed", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_USER_ID, userID),
-		))
+		telemetry.EmitEvent(ctx, "get_user_orders_failed",
+			log.String(telemetry.ATTR_USER_ID, userID),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user orders"})
 		return
 	}
@@ -178,9 +178,8 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 
 	var req UpdateOrderStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		span.RecordError(err)
 		span.SetStatus(codes.Error, "invalid request body")
-		span.AddEvent("invalid_request")
+		telemetry.EmitEvent(ctx, "invalid_request", log.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -190,11 +189,11 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 	)
 
 	if err := h.service.UpdateOrderStatus(ctx, orderID, req.Status); err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "failed to update order status")
-		span.AddEvent("status_update_failed", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_ORDER_ID, orderID),
-		))
+		telemetry.EmitEvent(ctx, "status_update_failed",
+			log.String(telemetry.ATTR_ORDER_ID, orderID),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
 		return
 	}
