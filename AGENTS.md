@@ -154,17 +154,20 @@ This section defines the tracing, metrics, and logging patterns used across the 
 - Add result-based attributes (like `result.count`) after the operation completes via `span.SetAttributes()`.
 
 ### Events
-- Use `span.AddEvent("description", trace.WithAttributes(...))` to mark milestones within a span.
+- Per [OTEP 4430](https://github.com/open-telemetry/opentelemetry-specification/blob/main/oteps/4430-span-event-api-deprecation-plan.md), the Span Event API (`span.AddEvent`) is deprecated. Emit events through the Logs API instead.
+- Use `telemetry.EmitEvent(ctx, "event name", log.String("key", value), ...)` to mark milestones within the active span.
+- The helper emits a log record correlated with the active span in `ctx`; event name and attributes are preserved.
 - Events are for moments in time; attributes are for the span as a whole.
 
 ### Error Recording
+- Per OTEP 4430, `span.RecordError` is deprecated. Emit exceptions through the Logs API instead.
 - On error paths, always use **both**:
   ```go
-  span.RecordError(err)                           // adds exception event with details
+  telemetry.EmitException(ctx, err)                // log-based exception event
   span.SetStatus(codes.Error, "short description") // marks span as failed
   ```
-- `RecordError` alone does NOT mark the span as failed — `SetStatus` is required.
-- For expected conditions (e.g., not-found), `SetStatus` without `RecordError` is acceptable.
+- `EmitException` alone does NOT mark the span as failed — `SetStatus` is still required.
+- For expected conditions (e.g., not-found), `SetStatus` without `EmitException` is acceptable.
 
 ### Baggage
 - Set baggage in handlers via `baggage.ContextWithBaggage(ctx, bag)`.

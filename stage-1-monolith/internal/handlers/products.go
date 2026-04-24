@@ -10,6 +10,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -54,9 +55,8 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		span.RecordError(err)
 		span.SetStatus(codes.Error, "invalid request body")
-		span.AddEvent("invalid_request")
+		telemetry.EmitEvent(ctx, "invalid_request", log.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -76,11 +76,11 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	)
 
 	if err := h.service.CreateProduct(ctx, product); err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "product creation failed")
-		span.AddEvent("product_creation_failed", trace.WithAttributes(
-			attribute.String("product.name", req.Name),
-		))
+		telemetry.EmitEvent(ctx, "product_creation_failed",
+			log.String("product.name", req.Name),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
 		return
 	}
@@ -102,11 +102,11 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 
 	product, err := h.service.GetProduct(ctx, productID)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "product not found")
-		span.AddEvent("product_not_found", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_ID, productID),
-		))
+		telemetry.EmitEvent(ctx, "product_not_found",
+			log.String(telemetry.ATTR_PRODUCT_ID, productID),
+		)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
@@ -136,9 +136,9 @@ func (h *ProductHandler) ListProducts(c *gin.Context) {
 
 	products, err := h.service.ListProducts(ctx, category, limit)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "failed to list products")
-		span.AddEvent("list_products_failed")
+		telemetry.EmitEvent(ctx, "list_products_failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list products"})
 		return
 	}
@@ -168,9 +168,8 @@ func (h *ProductHandler) UpdateStock(c *gin.Context) {
 
 	var req UpdateStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		span.RecordError(err)
 		span.SetStatus(codes.Error, "invalid request body")
-		span.AddEvent("invalid_request")
+		telemetry.EmitEvent(ctx, "invalid_request", log.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -180,11 +179,11 @@ func (h *ProductHandler) UpdateStock(c *gin.Context) {
 	)
 
 	if err := h.service.UpdateStock(ctx, productID, req.Quantity); err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "stock update failed")
-		span.AddEvent("stock_update_failed", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_ID, productID),
-		))
+		telemetry.EmitEvent(ctx, "stock_update_failed",
+			log.String(telemetry.ATTR_PRODUCT_ID, productID),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
 		return
 	}

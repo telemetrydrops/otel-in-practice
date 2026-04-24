@@ -9,6 +9,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
@@ -66,11 +67,10 @@ func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error
 		return err
 	}
 
-	span.AddEvent("order created successfully",
-		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_ORDER_ID, order.ID),
-			attribute.Int("items.count", len(order.Items)),
-		))
+	telemetry.EmitEvent(ctx, "order created successfully",
+		log.String(telemetry.ATTR_ORDER_ID, order.ID),
+		log.Int("items.count", len(order.Items)),
+	)
 
 	return nil
 }
@@ -148,10 +148,9 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, id string, status st
 		return fmt.Errorf("order not found: %s", id)
 	}
 
-	span.AddEvent("order status updated",
-		trace.WithAttributes(
-			attribute.String("new.status", status),
-		))
+	telemetry.EmitEvent(ctx, "order status updated",
+		log.String("new.status", status),
+	)
 
 	return nil
 }

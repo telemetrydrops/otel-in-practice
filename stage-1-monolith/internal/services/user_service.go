@@ -70,11 +70,11 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 		user.Tier = "free"
 	}
 
-	span.AddEvent("creating user in database")
+	telemetry.EmitEvent(ctx, "creating user in database")
 	if err := s.repo.Create(ctx, user); err != nil {
 		// Handle duplicate email specifically (atomic check)
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "already exists") {
-			span.AddEvent("user already exists (atomic check)")
+			telemetry.EmitEvent(ctx, "user already exists (atomic check)")
 			span.SetStatus(codes.Error, "duplicate email")
 			return nil, fmt.Errorf("user with email_hash %s already exists", telemetry.HashEmail(email))
 		}
@@ -95,7 +95,7 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 			}
 		}
 
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "user creation failed")
 		return nil, fmt.Errorf("creating user: %w", err)
 	}
@@ -109,7 +109,7 @@ success:
 		))
 
 	span.SetAttributes(attribute.String(telemetry.ATTR_USER_ID, user.ID))
-	span.AddEvent("user registered successfully")
+	telemetry.EmitEvent(ctx, "user registered successfully")
 
 	s.logger.Info("User registered successfully",
 		zap.String("user_id", user.ID),
@@ -132,7 +132,7 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, err
 			span.SetStatus(codes.Error, "user not found")
 			return nil, fmt.Errorf("user not found: %s", id)
 		}
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "user retrieval failed")
 		return nil, fmt.Errorf("getting user: %w", err)
 	}
@@ -154,7 +154,7 @@ func (s *UserService) ListUsers(ctx context.Context, limit int) ([]*models.User,
 
 	users, err := s.repo.List(ctx, limit)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "user listing failed")
 		return nil, fmt.Errorf("listing users: %w", err)
 	}

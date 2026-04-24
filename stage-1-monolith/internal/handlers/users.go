@@ -9,6 +9,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -50,9 +51,8 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		span.RecordError(err)
 		span.SetStatus(codes.Error, "invalid request body")
-		span.AddEvent("invalid_request")
+		telemetry.EmitEvent(ctx, "invalid_request", log.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -64,11 +64,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	user, err := h.service.RegisterUser(ctx, req.Email, req.Name, req.Tier)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "user registration failed")
-		span.AddEvent("user_creation_failed", trace.WithAttributes(
-			attribute.String("user.email_hash", telemetry.HashEmail(req.Email)),
-		))
+		telemetry.EmitEvent(ctx, "user_creation_failed",
+			log.String("user.email_hash", telemetry.HashEmail(req.Email)),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
@@ -90,11 +90,11 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 
 	user, err := h.service.GetUser(ctx, userID)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "user not found")
-		span.AddEvent("user_not_found", trace.WithAttributes(
-			attribute.String(telemetry.ATTR_USER_ID, userID),
-		))
+		telemetry.EmitEvent(ctx, "user_not_found",
+			log.String(telemetry.ATTR_USER_ID, userID),
+		)
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -122,9 +122,9 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 	users, err := h.service.ListUsers(ctx, limit)
 	if err != nil {
-		span.RecordError(err)
+		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "failed to list users")
-		span.AddEvent("list_users_failed")
+		telemetry.EmitEvent(ctx, "list_users_failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list users"})
 		return
 	}
