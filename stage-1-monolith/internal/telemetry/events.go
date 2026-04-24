@@ -20,6 +20,7 @@ func eventLogger() log.Logger {
 func EmitEvent(ctx context.Context, name string, attrs ...log.KeyValue) {
 	var r log.Record
 	r.SetEventName(name)
+	r.SetBody(log.StringValue(name))
 	if len(attrs) > 0 {
 		r.AddAttributes(attrs...)
 	}
@@ -37,6 +38,7 @@ func EmitException(ctx context.Context, err error) {
 	var r log.Record
 	r.SetEventName("exception")
 	r.SetSeverity(log.SeverityError)
+	r.SetBody(log.StringValue(err.Error()))
 	// exception.stacktrace is intentionally omitted: the Go error value does
 	// not carry its origin stack, and capturing runtime.Stack here would point
 	// at the emit site, not where the error arose. Per semconv, the attribute
