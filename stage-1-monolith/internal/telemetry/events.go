@@ -21,6 +21,7 @@ func EmitEvent(ctx context.Context, name string, attrs ...log.KeyValue) {
 	var r log.Record
 	r.SetEventName(name)
 	r.SetBody(log.StringValue(name))
+	r.SetSeverity(log.SeverityInfo)
 	if len(attrs) > 0 {
 		r.AddAttributes(attrs...)
 	}

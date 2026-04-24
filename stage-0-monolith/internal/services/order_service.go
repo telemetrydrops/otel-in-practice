@@ -3,12 +3,12 @@ package services
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/models"
 	"github.com/telemetrydrops/otel-in-practice/stage-0-monolith/internal/repositories"
-	"go.uber.org/zap"
 )
 
 // OrderService handles order business logic
@@ -16,7 +16,7 @@ type OrderService struct {
 	orderRepo       *repositories.OrderRepository
 	productRepo     *repositories.ProductRepository
 	userRepo        *repositories.UserRepository
-	logger          *zap.Logger
+	logger          *slog.Logger
 	goroutineLeaker *goroutineLeaker // For exercise: goroutine leak
 }
 
@@ -30,7 +30,7 @@ func NewOrderService(
 	orderRepo *repositories.OrderRepository,
 	productRepo *repositories.ProductRepository,
 	userRepo *repositories.UserRepository,
-	logger *zap.Logger,
+	logger *slog.Logger,
 ) (*OrderService, error) {
 	return &OrderService{
 		orderRepo:       orderRepo,
@@ -43,9 +43,9 @@ func NewOrderService(
 
 // CreateOrder processes a new order
 func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []OrderItemRequest, paymentMethod string) (*models.Order, error) {
-	s.logger.Info("Processing order",
-		zap.String("user_id", userID),
-		zap.Int("items", len(items)))
+	s.logger.InfoContext(ctx, "Processing order",
+		"user_id", userID,
+		"items", len(items))
 
 	// Verify user exists
 	_, err := s.userRepo.GetByID(ctx, userID)
@@ -104,9 +104,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	// Deliberately leak a goroutine for exercise (background processing simulation)
 	s.startBackgroundProcessing(order.ID)
 
-	s.logger.Info("Order created successfully",
-		zap.String("order_id", order.ID),
-		zap.Float64("total", total))
+	s.logger.InfoContext(ctx, "Order created successfully",
+		"order_id", order.ID,
+		"total", total)
 
 	return order, nil
 }
@@ -121,7 +121,7 @@ func (s *OrderService) startBackgroundProcessing(orderID string) {
 		for range ticker.C {
 			// Simulate background work that never completes
 			s.logger.Debug("Background processing for order",
-				zap.String("order_id", orderID))
+				"order_id", orderID)
 		}
 	}()
 }

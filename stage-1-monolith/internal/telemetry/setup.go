@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
-	"go.opentelemetry.io/contrib/bridges/otelzap"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	otelconf "go.opentelemetry.io/contrib/otelconf/v0.3.0"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/log"
@@ -19,8 +20,6 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	"go.opentelemetry.io/otel/trace"
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // Providers holds the OpenTelemetry providers and logger
@@ -28,7 +27,7 @@ type Providers struct {
 	TracerProvider trace.TracerProvider
 	MeterProvider  metric.MeterProvider
 	LoggerProvider log.LoggerProvider
-	Logger         *zap.Logger
+	Logger         *slog.Logger
 	Closer         func(ctx context.Context) error
 }
 
@@ -59,9 +58,9 @@ func providersFromConfig(ctx context.Context, scope, version, cfgFile string) (*
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// Return default providers if config doesn't exist
-			logger := zap.Must(zap.NewProduction())
+			logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 			logger.Warn("OpenTelemetry config file not found, using no-op providers",
-				zap.String("config_file", cfgFile))
+				"config_file", cfgFile)
 			return &Providers{
 				TracerProvider: tracenoop.NewTracerProvider(),
 				MeterProvider:  metricnoop.NewMeterProvider(),
@@ -105,21 +104,17 @@ func providersFromConfig(ctx context.Context, scope, version, cfgFile string) (*
 		return nil, err
 	}
 
-	// Create zap logger with OpenTelemetry bridge
-	core := zapcore.NewTee(
-		zapcore.NewCore(
-			zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-			zapcore.AddSync(os.Stdout),
-			zapcore.InfoLevel,
-		),
-		otelzap.NewCore(scope, otelzap.WithLoggerProvider(global.GetLoggerProvider())),
-	)
+	// Create slog logger that fans out to stdout (JSON) and the OpenTelemetry
+	// logs bridge so records are both human-readable and correlated with spans.
+	stdoutHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	otelHandler := otelslog.NewHandler(scope, otelslog.WithLoggerProvider(sdk.LoggerProvider()))
+	logger := slog.New(&multiHandler{handlers: []slog.Handler{stdoutHandler, otelHandler}})
 
 	return &Providers{
 		TracerProvider: sdk.TracerProvider(),
 		MeterProvider:  sdk.MeterProvider(),
 		LoggerProvider: sdk.LoggerProvider(),
-		Logger:         zap.New(core),
+		Logger:         logger,
 		Closer:         sdk.Shutdown,
 	}, nil
 }
@@ -131,4 +126,47 @@ func insertAttribute(attrs []otelconf.AttributeNameValue, name, value string) []
 		}
 	}
 	return append(attrs, otelconf.AttributeNameValue{Name: name, Value: value})
+}
+
+// multiHandler dispatches each record to every configured slog.Handler.
+type multiHandler struct {
+	handlers []slog.Handler
+}
+
+func (m *multiHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, h := range m.handlers {
+		if h.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *multiHandler) Handle(ctx context.Context, r slog.Record) error {
+	var errs []error
+	for _, h := range m.handlers {
+		if !h.Enabled(ctx, r.Level) {
+			continue
+		}
+		if err := h.Handle(ctx, r.Clone()); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (m *multiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	next := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		next[i] = h.WithAttrs(attrs)
+	}
+	return &multiHandler{handlers: next}
+}
+
+func (m *multiHandler) WithGroup(name string) slog.Handler {
+	next := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		next[i] = h.WithGroup(name)
+	}
+	return &multiHandler{handlers: next}
 }

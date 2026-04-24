@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 )
 
 // OrderService handles order business logic
@@ -24,7 +24,7 @@ type OrderService struct {
 	orderRepo       *repositories.OrderRepository
 	productRepo     *repositories.ProductRepository
 	userRepo        *repositories.UserRepository
-	logger          *zap.Logger
+	logger          *slog.Logger
 	tracer          trace.Tracer
 	processingHist  metric.Float64Histogram
 	activeOrders    metric.Int64UpDownCounter
@@ -41,7 +41,7 @@ func NewOrderService(
 	orderRepo *repositories.OrderRepository,
 	productRepo *repositories.ProductRepository,
 	userRepo *repositories.UserRepository,
-	logger *zap.Logger,
+	logger *slog.Logger,
 ) (*OrderService, error) {
 	meter := otel.Meter(telemetry.Scope)
 	processingHist, err := meter.Float64Histogram(
@@ -112,9 +112,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 		)
 	}
 
-	s.logger.Info("Processing order",
-		zap.String("user_id", userID),
-		zap.Int("items", len(items)))
+	s.logger.InfoContext(ctx, "Processing order",
+		"user_id", userID,
+		"items", len(items))
 
 	// Verify user exists
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -193,9 +193,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	s.startBackgroundProcessing(order.ID, span.SpanContext())
 
 	telemetry.EmitEvent(ctx, "order created successfully")
-	s.logger.Info("Order created successfully",
-		zap.String("order_id", order.ID),
-		zap.Float64("total", total))
+	s.logger.InfoContext(ctx, "Order created successfully",
+		"order_id", order.ID,
+		"total", total)
 
 	return order, nil
 }
@@ -227,8 +227,8 @@ func (s *OrderService) startBackgroundProcessing(orderID string, triggerSpanCtx 
 		ticker := time.NewTicker(10 * time.Second)
 		for range ticker.C {
 			// Simulate background work that never completes
-			s.logger.Debug("Background processing for order",
-				zap.String("order_id", orderID))
+			s.logger.DebugContext(bgCtx, "Background processing for order",
+				"order_id", orderID)
 		}
 	}()
 }

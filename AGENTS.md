@@ -78,9 +78,9 @@ Adhere strictly to standard Go idioms and the existing project style.
   import (
       "context"
       "fmt"
+      "log/slog"
 
       "github.com/gin-gonic/gin"
-      "go.uber.org/zap"
 
       "github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/models"
   )
@@ -100,9 +100,9 @@ Adhere strictly to standard Go idioms and the existing project style.
       return fmt.Errorf("failed to create user: %w", err)
   }
   ```
-- **Logging:** Log errors using the configured `zap.Logger` rather than `log.Println` or `fmt.Printf`.
+- **Logging:** Log errors using the configured `*slog.Logger` rather than `log.Println` or `fmt.Printf`. Prefer the `*Context` variants (`InfoContext`, `ErrorContext`, …) on request paths so the OpenTelemetry bridge can correlate log records with the active span.
   ```go
-  logger.Error("Failed to process order", zap.Error(err))
+  logger.ErrorContext(ctx, "Failed to process order", "error", err)
   ```
 
 ### Architecture & Patterns
@@ -194,8 +194,9 @@ This section defines the tracing, metrics, and logging patterns used across the 
 - Record metrics with `metric.WithAttributes(...)` for dimensionality.
 
 ### Logging
-- Use `zap.Logger` with structured fields.
-- The logger is bridged to OpenTelemetry via `otelzap` for log-trace correlation.
+- Use the standard library `*slog.Logger` with key/value attributes.
+- The logger is bridged to OpenTelemetry via `otelslog` for log-trace correlation.
+- On request paths, always call the `*Context` variants (`InfoContext`, `WarnContext`, `ErrorContext`, `DebugContext`) so the bridge can attach the active span to each record.
 
 ### Telemetry Constants
 - All span names, attribute keys, metric names, and baggage keys are centralized in `internal/telemetry/const.go`.
@@ -205,10 +206,10 @@ This section defines the tracing, metrics, and logging patterns used across the 
 
 - **Web Framework:** Gin (`github.com/gin-gonic/gin`)
 - **ORM:** GORM (`gorm.io/gorm`)
-- **Logging:** Zap (`go.uber.org/zap`)
+- **Logging:** slog (`log/slog`, standard library)
 - **Instrumentation:** OpenTelemetry (`go.opentelemetry.io/otel`)
 - **HTTP Middleware:** otelgin (`go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin`)
-- **Log Bridge:** otelzap (`go.opentelemetry.io/contrib/bridges/otelzap`)
+- **Log Bridge:** otelslog (`go.opentelemetry.io/contrib/bridges/otelslog`)
 - **Configuration:** otelconf (`go.opentelemetry.io/contrib/otelconf`)
 
 ## 5. Workflow Rules

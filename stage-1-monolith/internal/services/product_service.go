@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/models"
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/repositories"
@@ -13,21 +14,20 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 // ProductService handles product business logic
 type ProductService struct {
 	repo           *repositories.ProductRepository
-	logger         *zap.Logger
+	logger         *slog.Logger
 	tracer         trace.Tracer
 	lookupCounter  metric.Int64Counter
 	inventoryGauge metric.Float64ObservableGauge
 }
 
 // NewProductService creates a new product service
-func NewProductService(repo *repositories.ProductRepository, logger *zap.Logger) (*ProductService, error) {
+func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger) (*ProductService, error) {
 	meter := otel.Meter(telemetry.Scope)
 	lookupCounter, err := meter.Int64Counter(
 		telemetry.PRODUCT_LOOKUPS_TOTAL,
@@ -51,10 +51,10 @@ func NewProductService(repo *repositories.ProductRepository, logger *zap.Logger)
 		telemetry.PRODUCTS_INVENTORY_VALUE,
 		metric.WithDescription("Total value of products currently in stock"),
 		metric.WithUnit("USD"),
-		metric.WithFloat64Callback(func(_ context.Context, o metric.Float64Observer) error {
+		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
 			value, err := repo.GetTotalInventoryValue(context.Background())
 			if err != nil {
-				logger.Warn("Failed to read inventory value for metric", zap.Error(err))
+				logger.WarnContext(ctx, "Failed to read inventory value for metric", "error", err)
 				return nil
 			}
 			o.Observe(value)
@@ -120,9 +120,9 @@ func (s *ProductService) ListProducts(ctx context.Context, category string, limi
 		span.SetName("list products by category")
 	}
 
-	s.logger.Info("Listing products",
-		zap.String("category", category),
-		zap.Int("limit", limit))
+	s.logger.InfoContext(ctx, "Listing products",
+		"category", category,
+		"limit", limit)
 
 	products, err := s.repo.List(ctx, category, limit)
 	if err != nil {
@@ -164,9 +164,9 @@ func (s *ProductService) CreateProduct(ctx context.Context, product *models.Prod
 	span.SetAttributes(attribute.String(telemetry.ATTR_PRODUCT_ID, product.ID))
 	telemetry.EmitEvent(ctx, "product created successfully")
 
-	s.logger.Info("Product created",
-		zap.String("product_id", product.ID),
-		zap.String("name", product.Name))
+	s.logger.InfoContext(ctx, "Product created",
+		"product_id", product.ID,
+		"name", product.Name)
 
 	return nil
 }
@@ -191,9 +191,9 @@ func (s *ProductService) CheckInventory(ctx context.Context, productID string, q
 
 	if !hasStock {
 		telemetry.EmitEvent(ctx, "insufficient inventory")
-		s.logger.Warn("Insufficient inventory",
-			zap.String("product_id", productID),
-			zap.Int("requested", quantity))
+		s.logger.WarnContext(ctx, "Insufficient inventory",
+			"product_id", productID,
+			"requested", quantity)
 	}
 
 	return hasStock, nil
