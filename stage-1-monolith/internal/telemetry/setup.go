@@ -43,9 +43,7 @@ func SetupTelemetry(ctx context.Context, serviceName, version, configFile string
 	otel.SetTracerProvider(providers.TracerProvider)
 	otel.SetMeterProvider(providers.MeterProvider)
 	global.SetLoggerProvider(providers.LoggerProvider)
-	if providers.Propagator != nil {
-		otel.SetTextMapPropagator(providers.Propagator)
-	}
+	otel.SetTextMapPropagator(providers.Propagator)
 
 	return providers, nil
 }
@@ -63,6 +61,7 @@ func providersFromConfig(ctx context.Context, scope, version, cfgFile string) (*
 				TracerProvider: tracenoop.NewTracerProvider(),
 				MeterProvider:  metricnoop.NewMeterProvider(),
 				LoggerProvider: noop.NewLoggerProvider(),
+				Propagator:     propagation.NewCompositeTextMapPropagator(),
 				Logger:         logger,
 				Closer:         func(ctx context.Context) error { return nil },
 			}, nil
