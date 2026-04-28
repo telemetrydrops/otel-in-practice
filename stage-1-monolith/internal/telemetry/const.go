@@ -17,11 +17,12 @@ const (
 	SPAN_INVENTORY_CHECK   = "check inventory"
 
 	// Database operations
-	SPAN_USER_SELECT    = "SELECT users"
-	SPAN_USER_INSERT    = "INSERT users"
-	SPAN_ORDER_INSERT   = "INSERT orders"
-	SPAN_PRODUCT_SELECT = "SELECT products"
-	SPAN_PRODUCT_UPDATE = "UPDATE products"
+	SPAN_USER_SELECT          = "SELECT users"
+	SPAN_USER_INSERT          = "INSERT users"
+	SPAN_ORDER_INSERT         = "INSERT orders"
+	SPAN_PRODUCT_SELECT       = "SELECT products"
+	SPAN_PRODUCT_UPDATE       = "UPDATE products"
+	SPAN_INVENTORY_VALUE_CALC = "SELECT products aggregate"
 )
 
 // UCUM-compliant metrics
