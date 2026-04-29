@@ -71,8 +71,8 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	ctx = baggage.ContextWithBaggage(ctx, bag)
 
 	span.SetAttributes(
-		attribute.String(telemetry.ATTR_USER_ID, req.UserID),
-		attribute.String(telemetry.ATTR_PAYMENT_METHOD, req.PaymentMethod),
+		attribute.String(telemetry.AttrEcommerceUserId, req.UserID),
+		attribute.String(telemetry.AttrEcommercePaymentMethod, req.PaymentMethod),
 		attribute.Int("items.count", len(req.Items)),
 	)
 
@@ -81,15 +81,15 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "order creation failed")
 		telemetry.EmitEvent(ctx, "order_creation_failed",
-			log.String(telemetry.ATTR_USER_ID, req.UserID),
+			log.String(telemetry.AttrEcommerceUserId, req.UserID),
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	span.SetAttributes(
-		attribute.String(telemetry.ATTR_ORDER_ID, order.ID),
-		attribute.Float64(telemetry.ATTR_ORDER_TOTAL, order.Total),
+		attribute.String(telemetry.AttrEcommerceOrderId, order.ID),
+		attribute.Float64(telemetry.AttrEcommerceOrderTotal, order.Total),
 	)
 
 	c.JSON(http.StatusCreated, order)
@@ -104,7 +104,7 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "order_lookup"),
-		attribute.String(telemetry.ATTR_ORDER_ID, orderID),
+		attribute.String(telemetry.AttrEcommerceOrderId, orderID),
 	)
 
 	order, err := h.service.GetOrder(ctx, orderID)
@@ -112,7 +112,7 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "order not found")
 		telemetry.EmitEvent(ctx, "order_not_found",
-			log.String(telemetry.ATTR_ORDER_ID, orderID),
+			log.String(telemetry.AttrEcommerceOrderId, orderID),
 		)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
@@ -137,7 +137,7 @@ func (h *OrderHandler) GetUserOrders(c *gin.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "user_orders_lookup"),
-		attribute.String(telemetry.ATTR_USER_ID, userID),
+		attribute.String(telemetry.AttrEcommerceUserId, userID),
 		attribute.Int("limit", limit),
 	)
 
@@ -146,7 +146,7 @@ func (h *OrderHandler) GetUserOrders(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "failed to get user orders")
 		telemetry.EmitEvent(ctx, "get_user_orders_failed",
-			log.String(telemetry.ATTR_USER_ID, userID),
+			log.String(telemetry.AttrEcommerceUserId, userID),
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user orders"})
 		return
@@ -173,7 +173,7 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 	span.SetAttributes(
 		semconv.K8SClusterName("td-prod-1"),
 		attribute.String("business.operation", "order_status_update"),
-		attribute.String(telemetry.ATTR_ORDER_ID, orderID),
+		attribute.String(telemetry.AttrEcommerceOrderId, orderID),
 	)
 
 	var req UpdateOrderStatusRequest
@@ -192,7 +192,7 @@ func (h *OrderHandler) UpdateOrderStatus(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "failed to update order status")
 		telemetry.EmitEvent(ctx, "status_update_failed",
-			log.String(telemetry.ATTR_ORDER_ID, orderID),
+			log.String(telemetry.AttrEcommerceOrderId, orderID),
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
 		return

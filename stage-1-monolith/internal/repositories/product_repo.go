@@ -9,6 +9,7 @@ import (
 	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
@@ -32,10 +33,10 @@ func (r *ProductRepository) Create(ctx context.Context, product *models.Product)
 	ctx, span := r.tracer.Start(ctx, "INSERT products",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "INSERT"),
-			attribute.String("db.sql.table", "products"),
-			attribute.String(telemetry.ATTR_PRODUCT_ID, product.ID),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("INSERT"),
+			semconv.DBCollectionName("products"),
+			attribute.String(telemetry.AttrEcommerceProductId, product.ID),
 		))
 	defer span.End()
 
@@ -52,13 +53,13 @@ func (r *ProductRepository) Create(ctx context.Context, product *models.Product)
 
 // GetByID retrieves a product by ID
 func (r *ProductRepository) GetByID(ctx context.Context, id string) (*models.Product, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_PRODUCT_SELECT,
+	ctx, span := r.tracer.Start(ctx, "SELECT products",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "products"),
-			attribute.String(telemetry.ATTR_PRODUCT_ID, id),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("products"),
+			attribute.String(telemetry.AttrEcommerceProductId, id),
 		))
 	defer span.End()
 
@@ -73,13 +74,13 @@ func (r *ProductRepository) GetByID(ctx context.Context, id string) (*models.Pro
 // List retrieves products with optional category filter and limit
 // This method deliberately contains an N+1 query problem for exercise purposes
 func (r *ProductRepository) List(ctx context.Context, category string, limit int) ([]*models.Product, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_PRODUCT_SELECT,
+	ctx, span := r.tracer.Start(ctx, "SELECT products",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "products"),
-			attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, category),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("products"),
+			attribute.String(telemetry.AttrEcommerceProductCategory, category),
 			attribute.Int("limit", limit),
 		))
 	defer span.End()
@@ -115,13 +116,13 @@ func (r *ProductRepository) List(ctx context.Context, category string, limit int
 
 // UpdateStock updates the stock quantity for a product
 func (r *ProductRepository) UpdateStock(ctx context.Context, id string, quantity int) error {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_PRODUCT_UPDATE,
+	ctx, span := r.tracer.Start(ctx, "UPDATE products",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "UPDATE"),
-			attribute.String("db.sql.table", "products"),
-			attribute.String(telemetry.ATTR_PRODUCT_ID, id),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("UPDATE"),
+			semconv.DBCollectionName("products"),
+			attribute.String(telemetry.AttrEcommerceProductId, id),
 			attribute.Int("stock.change", quantity),
 		))
 	defer span.End()
@@ -155,10 +156,10 @@ func (r *ProductRepository) GetTotalInventoryValue(ctx context.Context) (float64
 
 // CheckStock verifies if a product has sufficient stock
 func (r *ProductRepository) CheckStock(ctx context.Context, id string, requiredQuantity int) (bool, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_INVENTORY_CHECK,
+	ctx, span := r.tracer.Start(ctx, telemetry.SpanEcommerceInventoryCheckName,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_ID, id),
+			attribute.String(telemetry.AttrEcommerceProductId, id),
 			attribute.Int("required.quantity", requiredQuantity),
 		))
 	defer span.End()

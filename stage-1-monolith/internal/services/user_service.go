@@ -30,9 +30,9 @@ type UserService struct {
 func NewUserService(repo *repositories.UserRepository, logger *slog.Logger) (*UserService, error) {
 	meter := otel.Meter(telemetry.Scope)
 	registrationCounter, err := meter.Int64Counter(
-		telemetry.USER_REGISTRATIONS_TOTAL,
+		telemetry.EcommerceUsersRegistrationsName,
 		metric.WithDescription("Total number of user registrations"),
-		metric.WithUnit("{registrations}"),
+		metric.WithUnit(telemetry.EcommerceUsersRegistrationsUnit),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating registration counter: %w", err)
@@ -48,10 +48,10 @@ func NewUserService(repo *repositories.UserRepository, logger *slog.Logger) (*Us
 
 // RegisterUser creates a new user account
 func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string) (*models.User, error) {
-	ctx, span := s.tracer.Start(ctx, telemetry.SPAN_USER_REGISTRATION,
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceUserRegisterName,
 		trace.WithAttributes(
 			attribute.String("user.email_hash", telemetry.HashEmail(email)),
-			attribute.String(telemetry.ATTR_CUSTOMER_TIER, tier),
+			attribute.String(telemetry.AttrEcommerceCustomerTier, tier),
 		))
 	defer span.End()
 
@@ -105,10 +105,10 @@ success:
 	s.registrationCounter.Add(ctx, 1,
 		metric.WithAttributes(
 			attribute.String("registration.source", "api"),
-			attribute.String(telemetry.ATTR_CUSTOMER_TIER, user.Tier),
+			attribute.String(telemetry.AttrEcommerceCustomerTier, user.Tier),
 		))
 
-	span.SetAttributes(attribute.String(telemetry.ATTR_USER_ID, user.ID))
+	span.SetAttributes(attribute.String(telemetry.AttrEcommerceUserId, user.ID))
 	telemetry.EmitEvent(ctx, "user registered successfully")
 
 	s.logger.InfoContext(ctx, "User registered successfully",
@@ -120,9 +120,9 @@ success:
 
 // GetUser retrieves a user by ID
 func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, error) {
-	ctx, span := s.tracer.Start(ctx, "get user",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceUserGetName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_USER_ID, id),
+			attribute.String(telemetry.AttrEcommerceUserId, id),
 		))
 	defer span.End()
 
@@ -138,7 +138,7 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, err
 	}
 
 	span.SetAttributes(
-		attribute.String(telemetry.ATTR_CUSTOMER_TIER, user.Tier),
+		attribute.String(telemetry.AttrEcommerceCustomerTier, user.Tier),
 	)
 
 	return user, nil
@@ -146,7 +146,7 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*models.User, err
 
 // ListUsers retrieves all users
 func (s *UserService) ListUsers(ctx context.Context, limit int) ([]*models.User, error) {
-	ctx, span := s.tracer.Start(ctx, "list users",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceUserListName,
 		trace.WithAttributes(
 			attribute.Int("limit", limit),
 		))

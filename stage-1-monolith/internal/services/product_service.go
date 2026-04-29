@@ -30,9 +30,9 @@ type ProductService struct {
 func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger) (*ProductService, error) {
 	meter := otel.Meter(telemetry.Scope)
 	lookupCounter, err := meter.Int64Counter(
-		telemetry.PRODUCT_LOOKUPS_TOTAL,
+		telemetry.EcommerceProductsLookupsName,
 		metric.WithDescription("Total number of product lookups"),
-		metric.WithUnit("{lookups}"),
+		metric.WithUnit(telemetry.EcommerceProductsLookupsUnit),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating lookup counter: %w", err)
@@ -48,9 +48,9 @@ func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger
 	// Register an observable gauge with a callback.
 	// The SDK calls this function on each metric collection interval.
 	inventoryGauge, err := meter.Float64ObservableGauge(
-		telemetry.PRODUCTS_INVENTORY_VALUE,
+		telemetry.EcommerceProductsInventoryValueName,
 		metric.WithDescription("Total value of products currently in stock"),
-		metric.WithUnit("USD"),
+		metric.WithUnit(telemetry.EcommerceProductsInventoryValueUnit),
 		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
 			value, err := repo.GetTotalInventoryValue(context.Background())
 			if err != nil {
@@ -71,9 +71,9 @@ func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger
 
 // GetProduct retrieves a product by ID
 func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Product, error) {
-	ctx, span := s.tracer.Start(ctx, telemetry.SPAN_PRODUCT_LOOKUP,
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductLookupName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_ID, id),
+			attribute.String(telemetry.AttrEcommerceProductId, id),
 		))
 	defer span.End()
 
@@ -91,13 +91,13 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 	// Record metric
 	s.lookupCounter.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, product.Category),
+			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
 		))
 
 	// Use IsRecording to guard expensive attribute computation
 	if span.IsRecording() {
 		span.SetAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, product.Category),
+			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
 			attribute.Float64("product.price", product.Price),
 			attribute.Int("product.stock", product.Stock),
 		)
@@ -108,17 +108,12 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 
 // ListProducts retrieves products with optional filters
 func (s *ProductService) ListProducts(ctx context.Context, category string, limit int) ([]*models.Product, error) {
-	ctx, span := s.tracer.Start(ctx, "list products",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductListName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, category),
+			attribute.String(telemetry.AttrEcommerceProductCategory, category),
 			attribute.Int("limit", limit),
 		))
 	defer span.End()
-
-	// Refine span name based on actual operation
-	if category != "" {
-		span.SetName("list products by category")
-	}
 
 	s.logger.InfoContext(ctx, "Listing products",
 		"category", category,
@@ -137,10 +132,10 @@ func (s *ProductService) ListProducts(ctx context.Context, category string, limi
 
 // CreateProduct adds a new product to the catalog
 func (s *ProductService) CreateProduct(ctx context.Context, product *models.Product) error {
-	ctx, span := s.tracer.Start(ctx, "create product",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductCreateName,
 		trace.WithAttributes(
 			attribute.String("product.name", product.Name),
-			attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, product.Category),
+			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
 			attribute.Float64("product.price", product.Price),
 		))
 	defer span.End()
@@ -161,7 +156,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, product *models.Prod
 		return fmt.Errorf("creating product: %w", err)
 	}
 
-	span.SetAttributes(attribute.String(telemetry.ATTR_PRODUCT_ID, product.ID))
+	span.SetAttributes(attribute.String(telemetry.AttrEcommerceProductId, product.ID))
 	telemetry.EmitEvent(ctx, "product created successfully")
 
 	s.logger.InfoContext(ctx, "Product created",
@@ -173,9 +168,9 @@ func (s *ProductService) CreateProduct(ctx context.Context, product *models.Prod
 
 // CheckInventory verifies if a product has sufficient stock
 func (s *ProductService) CheckInventory(ctx context.Context, productID string, quantity int) (bool, error) {
-	ctx, span := s.tracer.Start(ctx, telemetry.SPAN_INVENTORY_CHECK,
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceInventoryCheckName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_ID, productID),
+			attribute.String(telemetry.AttrEcommerceProductId, productID),
 			attribute.Int("requested.quantity", quantity),
 		))
 	defer span.End()
@@ -201,9 +196,9 @@ func (s *ProductService) CheckInventory(ctx context.Context, productID string, q
 
 // UpdateStock adjusts the stock level of a product
 func (s *ProductService) UpdateStock(ctx context.Context, productID string, quantityChange int) error {
-	ctx, span := s.tracer.Start(ctx, "update stock",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductStockUpdateName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_PRODUCT_ID, productID),
+			attribute.String(telemetry.AttrEcommerceProductId, productID),
 			attribute.Int("quantity.change", quantityChange),
 		))
 	defer span.End()
