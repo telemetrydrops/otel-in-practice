@@ -48,6 +48,10 @@ jobs:
         run: |
           git fetch origin "$BASE_REF":__base
           git worktree add /tmp/base __base
+          if [ ! -f /tmp/base/stage-1-monolith/telemetry/registry/manifest.yaml ]; then
+            echo "No baseline registry on $BASE_REF; skipping diff."
+            exit 0
+          fi
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             -v "$WORKSPACE:/work" \
