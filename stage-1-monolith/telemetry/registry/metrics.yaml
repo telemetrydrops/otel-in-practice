@@ -20,13 +20,13 @@ metrics:
 
   - name: ecommerce.users.registrations
     instrument: counter
-    unit: "{registrations}"
+    unit: "{registration}"
     stability: stable
     brief: "Total number of successful user registrations."
 
   - name: ecommerce.products.lookups
     instrument: counter
-    unit: "{lookups}"
+    unit: "{lookup}"
     stability: stable
     brief: "Total number of product lookups."
 

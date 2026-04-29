@@ -18,6 +18,7 @@ jobs:
           WORKSPACE: ${{ github.workspace }}
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$WORKSPACE:/work" \
             otel/weaver:v0.22.1 \
             registry check \
@@ -28,6 +29,7 @@ jobs:
           WORKSPACE: ${{ github.workspace }}
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$WORKSPACE:/work" \
             otel/weaver:v0.22.1 \
             registry generate \
@@ -35,7 +37,7 @@ jobs:
               --templates /work/stage-1-monolith/telemetry/templates/ \
               go \
               /work/stage-1-monolith/internal/telemetry/
-          gofmt -w stage-1-monolith/internal/telemetry/attributes_gen.go stage-1-monolith/internal/telemetry/metrics_gen.go
+          gofmt -w stage-1-monolith/internal/telemetry/
           git diff --exit-code stage-1-monolith/internal/telemetry/
 
       - name: Diff against base branch
@@ -47,6 +49,7 @@ jobs:
           git fetch origin "$BASE_REF":__base
           git worktree add /tmp/base __base
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$WORKSPACE:/work" \
             -v /tmp/base:/baseline \
             otel/weaver:v0.22.1 \

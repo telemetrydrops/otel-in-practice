@@ -12,3 +12,16 @@ const (
 {% endfor %}
 {% endfor %}
 )
+
+{% for group in ctx %}
+{% for attr in group.attributes %}
+{% if attr.type is mapping and attr.type.members is defined %}
+// Allowed values for {{ attr.name }}.
+const (
+{% for m in attr.type.members %}
+    {{ attr.name | pascal_case_const }}{{ m.id | pascal_case_const }} = "{{ m.value }}"
+{% endfor %}
+)
+{% endif %}
+{% endfor %}
+{% endfor %}
