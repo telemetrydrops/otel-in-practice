@@ -59,7 +59,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	span.SetAttributes(
 		attribute.String("user.email_hash", telemetry.HashEmail(req.Email)),
-		attribute.String(telemetry.ATTR_CUSTOMER_TIER, req.Tier),
+		attribute.String(telemetry.AttrEcommerceCustomerTier, req.Tier),
 	)
 
 	user, err := h.service.RegisterUser(ctx, req.Email, req.Name, req.Tier)
@@ -85,7 +85,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "user_lookup"),
-		attribute.String(telemetry.ATTR_USER_ID, userID),
+		attribute.String(telemetry.AttrEcommerceUserId, userID),
 	)
 
 	user, err := h.service.GetUser(ctx, userID)
@@ -93,7 +93,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "user not found")
 		telemetry.EmitEvent(ctx, "user_not_found",
-			log.String(telemetry.ATTR_USER_ID, userID),
+			log.String(telemetry.AttrEcommerceUserId, userID),
 		)
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return

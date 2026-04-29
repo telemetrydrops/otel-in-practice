@@ -45,19 +45,19 @@ func NewOrderService(
 ) (*OrderService, error) {
 	meter := otel.Meter(telemetry.Scope)
 	processingHist, err := meter.Float64Histogram(
-		telemetry.ORDER_PROCESSING_DURATION,
+		telemetry.EcommerceOrdersProcessingDurationName,
 		metric.WithDescription("Duration of order processing"),
-		metric.WithUnit("ms"),
-		metric.WithExplicitBucketBoundaries(5, 10, 25, 50, 100, 250, 500, 1000, 2500),
+		metric.WithUnit(telemetry.EcommerceOrdersProcessingDurationUnit),
+		metric.WithExplicitBucketBoundaries(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating processing histogram: %w", err)
 	}
 
 	activeOrders, err := meter.Int64UpDownCounter(
-		telemetry.ORDERS_ACTIVE,
+		telemetry.EcommerceOrdersActiveName,
 		metric.WithDescription("Number of orders currently being processed"),
-		metric.WithUnit("{orders}"),
+		metric.WithUnit(telemetry.EcommerceOrdersActiveUnit),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating active orders counter: %w", err)
@@ -78,10 +78,10 @@ func NewOrderService(
 // CreateOrder processes a new order
 func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []OrderItemRequest, paymentMethod string) (*models.Order, error) {
 	startTime := time.Now()
-	ctx, span := s.tracer.Start(ctx, telemetry.SPAN_ORDER_PROCESSING,
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceOrderProcessName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_USER_ID, userID),
-			attribute.String(telemetry.ATTR_PAYMENT_METHOD, paymentMethod),
+			attribute.String(telemetry.AttrEcommerceUserId, userID),
+			attribute.String(telemetry.AttrEcommercePaymentMethod, paymentMethod),
 			attribute.Int("items.count", len(items)),
 		))
 	defer span.End()
@@ -89,18 +89,18 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	// Track active orders: increment now, decrement when done
 	s.activeOrders.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String(telemetry.ATTR_PAYMENT_METHOD, paymentMethod),
+			attribute.String(telemetry.AttrEcommercePaymentMethod, paymentMethod),
 		))
 	defer func() {
 		s.activeOrders.Add(ctx, -1,
 			metric.WithAttributes(
-				attribute.String(telemetry.ATTR_PAYMENT_METHOD, paymentMethod),
+				attribute.String(telemetry.AttrEcommercePaymentMethod, paymentMethod),
 			))
 		// Record processing duration
-		duration := float64(time.Since(startTime).Milliseconds())
+		duration := time.Since(startTime).Seconds()
 		s.processingHist.Record(ctx, duration,
 			metric.WithAttributes(
-				attribute.String(telemetry.ATTR_PAYMENT_METHOD, paymentMethod),
+				attribute.String(telemetry.AttrEcommercePaymentMethod, paymentMethod),
 			))
 	}()
 
@@ -123,7 +123,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 		span.SetStatus(codes.Error, "user not found")
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
-	span.SetAttributes(attribute.String(telemetry.ATTR_CUSTOMER_TIER, user.Tier))
+	span.SetAttributes(attribute.String(telemetry.AttrEcommerceCustomerTier, user.Tier))
 
 	// Process order items and calculate total
 	var orderItems []models.OrderItem
@@ -184,8 +184,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, items []O
 	}
 
 	span.SetAttributes(
-		attribute.String(telemetry.ATTR_ORDER_ID, order.ID),
-		attribute.Float64(telemetry.ATTR_ORDER_TOTAL, total),
+		attribute.String(telemetry.AttrEcommerceOrderId, order.ID),
+		attribute.Float64(telemetry.AttrEcommerceOrderTotal, total),
 	)
 
 	// Deliberately leak a goroutine for exercise (background processing simulation)
@@ -216,7 +216,7 @@ func (s *OrderService) startBackgroundProcessing(orderID string, triggerSpanCtx 
 				},
 			}),
 			trace.WithAttributes(
-				attribute.String(telemetry.ATTR_ORDER_ID, orderID),
+				attribute.String(telemetry.AttrEcommerceOrderId, orderID),
 			),
 		)
 		telemetry.EmitEvent(bgCtx, "background processing started")
@@ -235,9 +235,9 @@ func (s *OrderService) startBackgroundProcessing(orderID string, triggerSpanCtx 
 
 // GetOrder retrieves an order by ID
 func (s *OrderService) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
-	ctx, span := s.tracer.Start(ctx, "get order",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceOrderGetName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_ORDER_ID, orderID),
+			attribute.String(telemetry.AttrEcommerceOrderId, orderID),
 		))
 	defer span.End()
 
@@ -249,9 +249,9 @@ func (s *OrderService) GetOrder(ctx context.Context, orderID string) (*models.Or
 	}
 
 	span.SetAttributes(
-		attribute.String(telemetry.ATTR_USER_ID, order.UserID),
+		attribute.String(telemetry.AttrEcommerceUserId, order.UserID),
 		attribute.String("order.status", order.Status),
-		attribute.Float64(telemetry.ATTR_ORDER_TOTAL, order.Total),
+		attribute.Float64(telemetry.AttrEcommerceOrderTotal, order.Total),
 	)
 
 	return order, nil
@@ -259,9 +259,9 @@ func (s *OrderService) GetOrder(ctx context.Context, orderID string) (*models.Or
 
 // GetUserOrders retrieves orders for a user
 func (s *OrderService) GetUserOrders(ctx context.Context, userID string, limit int) ([]*models.Order, error) {
-	ctx, span := s.tracer.Start(ctx, "get user orders",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceOrderListName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_USER_ID, userID),
+			attribute.String(telemetry.AttrEcommerceUserId, userID),
 			attribute.Int("limit", limit),
 		))
 	defer span.End()
@@ -279,9 +279,9 @@ func (s *OrderService) GetUserOrders(ctx context.Context, userID string, limit i
 
 // UpdateOrderStatus updates the status of an order
 func (s *OrderService) UpdateOrderStatus(ctx context.Context, orderID, status string) error {
-	ctx, span := s.tracer.Start(ctx, "update order status",
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceOrderStatusUpdateName,
 		trace.WithAttributes(
-			attribute.String(telemetry.ATTR_ORDER_ID, orderID),
+			attribute.String(telemetry.AttrEcommerceOrderId, orderID),
 			attribute.String("new.status", status),
 		))
 	defer span.End()

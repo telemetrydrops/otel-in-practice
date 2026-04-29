@@ -71,7 +71,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	span.SetAttributes(
 		attribute.String("product.name", req.Name),
-		attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, req.Category),
+		attribute.String(telemetry.AttrEcommerceProductCategory, req.Category),
 		attribute.Float64("product.price", req.Price),
 	)
 
@@ -97,7 +97,7 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "product_lookup"),
-		attribute.String(telemetry.ATTR_PRODUCT_ID, productID),
+		attribute.String(telemetry.AttrEcommerceProductId, productID),
 	)
 
 	product, err := h.service.GetProduct(ctx, productID)
@@ -105,7 +105,7 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "product not found")
 		telemetry.EmitEvent(ctx, "product_not_found",
-			log.String(telemetry.ATTR_PRODUCT_ID, productID),
+			log.String(telemetry.AttrEcommerceProductId, productID),
 		)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
@@ -130,7 +130,7 @@ func (h *ProductHandler) ListProducts(c *gin.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "product_list"),
-		attribute.String(telemetry.ATTR_PRODUCT_CATEGORY, category),
+		attribute.String(telemetry.AttrEcommerceProductCategory, category),
 		attribute.Int("limit", limit),
 	)
 
@@ -163,7 +163,7 @@ func (h *ProductHandler) UpdateStock(c *gin.Context) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("business.operation", "stock_update"),
-		attribute.String(telemetry.ATTR_PRODUCT_ID, productID),
+		attribute.String(telemetry.AttrEcommerceProductId, productID),
 	)
 
 	var req UpdateStockRequest
@@ -182,7 +182,7 @@ func (h *ProductHandler) UpdateStock(c *gin.Context) {
 		telemetry.EmitException(ctx, err)
 		span.SetStatus(codes.Error, "stock update failed")
 		telemetry.EmitEvent(ctx, "stock_update_failed",
-			log.String(telemetry.ATTR_PRODUCT_ID, productID),
+			log.String(telemetry.AttrEcommerceProductId, productID),
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
 		return

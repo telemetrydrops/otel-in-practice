@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
+	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
@@ -30,13 +31,13 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 
 // Create inserts a new user into the database
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_INSERT,
+	ctx, span := r.tracer.Start(ctx, "INSERT users",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "INSERT"),
-			attribute.String("db.sql.table", "users"),
-			attribute.String(telemetry.ATTR_USER_ID, user.ID),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("INSERT"),
+			semconv.DBCollectionName("users"),
+			attribute.String(telemetry.AttrEcommerceUserId, user.ID),
 		))
 	defer span.End()
 
@@ -49,20 +50,20 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	}
 
 	telemetry.EmitEvent(ctx, "user created in database",
-		log.String(telemetry.ATTR_USER_ID, user.ID))
+		log.String(telemetry.AttrEcommerceUserId, user.ID))
 
 	return nil
 }
 
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_SELECT,
+	ctx, span := r.tracer.Start(ctx, "SELECT users",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "users"),
-			attribute.String(telemetry.ATTR_USER_ID, id),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("users"),
+			attribute.String(telemetry.AttrEcommerceUserId, id),
 		))
 	defer span.End()
 
@@ -76,12 +77,12 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 
 // GetByEmail retrieves a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_SELECT,
+	ctx, span := r.tracer.Start(ctx, "SELECT users",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "users"),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("users"),
 			attribute.String("user.email_hash", telemetry.HashEmail(email)),
 		))
 	defer span.End()
@@ -96,12 +97,12 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 
 // List retrieves all users with optional limit
 func (r *UserRepository) List(ctx context.Context, limit int) ([]*models.User, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_USER_SELECT,
+	ctx, span := r.tracer.Start(ctx, "SELECT users",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "users"),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("users"),
 			attribute.Int("limit", limit),
 		))
 	defer span.End()

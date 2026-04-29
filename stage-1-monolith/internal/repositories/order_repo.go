@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
+	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
@@ -30,15 +31,15 @@ func NewOrderRepository(db *gorm.DB) *OrderRepository {
 
 // Create inserts a new order into the database
 func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error {
-	ctx, span := r.tracer.Start(ctx, telemetry.SPAN_ORDER_INSERT,
+	ctx, span := r.tracer.Start(ctx, "INSERT orders",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "INSERT"),
-			attribute.String("db.sql.table", "orders"),
-			attribute.String(telemetry.ATTR_ORDER_ID, order.ID),
-			attribute.String(telemetry.ATTR_USER_ID, order.UserID),
-			attribute.Float64(telemetry.ATTR_ORDER_TOTAL, order.Total),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("INSERT"),
+			semconv.DBCollectionName("orders"),
+			attribute.String(telemetry.AttrEcommerceOrderId, order.ID),
+			attribute.String(telemetry.AttrEcommerceUserId, order.UserID),
+			attribute.Float64(telemetry.AttrEcommerceOrderTotal, order.Total),
 		))
 	defer span.End()
 
@@ -68,7 +69,7 @@ func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error
 	}
 
 	telemetry.EmitEvent(ctx, "order created successfully",
-		log.String(telemetry.ATTR_ORDER_ID, order.ID),
+		log.String(telemetry.AttrEcommerceOrderId, order.ID),
 		log.Int("items.count", len(order.Items)),
 	)
 
@@ -80,10 +81,10 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*models.Order
 	ctx, span := r.tracer.Start(ctx, "SELECT orders",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "orders"),
-			attribute.String(telemetry.ATTR_ORDER_ID, id),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("orders"),
+			attribute.String(telemetry.AttrEcommerceOrderId, id),
 		))
 	defer span.End()
 
@@ -100,10 +101,10 @@ func (r *OrderRepository) ListByUserID(ctx context.Context, userID string, limit
 	ctx, span := r.tracer.Start(ctx, "SELECT orders",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "SELECT"),
-			attribute.String("db.sql.table", "orders"),
-			attribute.String(telemetry.ATTR_USER_ID, userID),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("orders"),
+			attribute.String(telemetry.AttrEcommerceUserId, userID),
 			attribute.Int("limit", limit),
 		))
 	defer span.End()
@@ -128,10 +129,10 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, id string, status st
 	ctx, span := r.tracer.Start(ctx, "UPDATE orders",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String("db.system", "postgresql"),
-			attribute.String("db.operation", "UPDATE"),
-			attribute.String("db.sql.table", "orders"),
-			attribute.String(telemetry.ATTR_ORDER_ID, id),
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("UPDATE"),
+			semconv.DBCollectionName("orders"),
+			attribute.String(telemetry.AttrEcommerceOrderId, id),
 			attribute.String("order.status", status),
 		))
 	defer span.End()
