@@ -156,9 +156,12 @@ func (r *ProductRepository) GetTotalInventoryValue(ctx context.Context) (float64
 
 // CheckStock verifies if a product has sufficient stock
 func (r *ProductRepository) CheckStock(ctx context.Context, id string, requiredQuantity int) (bool, error) {
-	ctx, span := r.tracer.Start(ctx, telemetry.SpanEcommerceInventoryCheckName,
+	ctx, span := r.tracer.Start(ctx, "SELECT products",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("SELECT"),
+			semconv.DBCollectionName("products"),
 			attribute.String(telemetry.AttrEcommerceProductId, id),
 			attribute.Int("required.quantity", requiredQuantity),
 		))
