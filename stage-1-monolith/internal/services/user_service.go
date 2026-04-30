@@ -101,6 +101,12 @@ func (s *UserService) RegisterUser(ctx context.Context, email, name, tier string
 	}
 
 success:
+	// Clamp tier to known values before recording metric to prevent unbounded series
+	validTiers := map[string]bool{"standard": true, "premium": true, "free": true}
+	if !validTiers[user.Tier] {
+		user.Tier = "unknown"
+	}
+
 	// Record metric
 	s.registrationCounter.Add(ctx, 1,
 		metric.WithAttributes(
