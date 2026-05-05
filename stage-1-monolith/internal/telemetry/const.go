@@ -18,3 +18,8 @@ const (
 const (
 	BAGGAGE_PAYMENT_METHOD = "payment.method"
 )
+
+// Attribute keys for inventory operations
+const (
+	AttrEcommerceRequestedQuantity = "requested.quantity"
+)

@@ -171,7 +171,7 @@ func (s *ProductService) CheckInventory(ctx context.Context, productID string, q
 	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceInventoryCheckName,
 		trace.WithAttributes(
 			attribute.String(telemetry.AttrEcommerceProductId, productID),
-			attribute.Int("requested.quantity", quantity),
+			attribute.Int(telemetry.AttrEcommerceRequestedQuantity, quantity),
 		))
 	defer span.End()
 
