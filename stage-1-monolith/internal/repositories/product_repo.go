@@ -160,7 +160,7 @@ func (r *ProductRepository) CheckStock(ctx context.Context, id string, requiredQ
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String(telemetry.AttrEcommerceProductId, id),
-			attribute.Int("required.quantity", requiredQuantity),
+			attribute.Int(telemetry.AttrEcommerceRequestedQuantity, requiredQuantity),
 		))
 	defer span.End()
 
