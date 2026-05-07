@@ -18,3 +18,9 @@ const (
 const (
 	BAGGAGE_PAYMENT_METHOD = "payment.method"
 )
+
+// Additional span names not in the generated registry.
+const (
+	// SpanEcommerceInventoryValueName is used for the aggregate inventory value query.
+	SpanEcommerceInventoryValueName = "ecommerce.inventory.value"
+)

@@ -52,7 +52,7 @@ func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger
 		metric.WithDescription("Total value of products currently in stock"),
 		metric.WithUnit(telemetry.EcommerceProductsInventoryValueUnit),
 		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
-			value, err := repo.GetTotalInventoryValue(context.Background())
+			value, err := repo.GetTotalInventoryValue(ctx)
 			if err != nil {
 				logger.WarnContext(ctx, "Failed to read inventory value for metric", "error", err)
 				return nil
