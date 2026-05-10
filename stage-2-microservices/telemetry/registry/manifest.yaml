@@ -1,0 +1,4 @@
+name: ecommerce
+description: "Telemetry conventions for the ecommerce two-service split"
+semconv_version: 0.2.0
+schema_url: https://telemetrydrops.com/schemas/ecommerce

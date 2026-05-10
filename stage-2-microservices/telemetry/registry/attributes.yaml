@@ -1,0 +1,66 @@
+file_format: definition/2
+
+attributes:
+  - key: ecommerce.user.id
+    type: string
+    stability: stable
+    brief: "Identifier of the customer performing the operation."
+    examples: ['user-9f3a', 'user-1c2d']
+
+  - key: ecommerce.order.id
+    type: string
+    stability: stable
+    brief: "Identifier of the order being processed."
+    examples: ['ord-2024-0001', 'ord-2024-0042']
+
+  - key: ecommerce.order.total
+    type: double
+    stability: stable
+    brief: "Order total in the customer's billing currency."
+    examples: [19.99, 149.00]
+
+  - key: ecommerce.product.id
+    type: string
+    stability: stable
+    brief: "Identifier of the product being looked up or sold."
+    examples: ['prod-a1', 'prod-b7']
+
+  - key: ecommerce.product.category
+    type: string
+    stability: stable
+    brief: "Category the product belongs to."
+    examples: ['books', 'electronics']
+
+  - key: ecommerce.payment.method
+    type:
+      allow_custom_values: true
+      members:
+        - id: credit_card
+          value: credit_card
+          stability: stable
+          brief: "Credit or debit card"
+        - id: paypal
+          value: paypal
+          stability: stable
+          brief: "PayPal account"
+        - id: apple_pay
+          value: apple_pay
+          stability: stable
+          brief: "Apple Pay"
+    stability: stable
+    brief: "Payment method selected by the customer."
+
+  - key: ecommerce.customer.tier
+    type:
+      allow_custom_values: false
+      members:
+        - id: standard
+          value: standard
+          stability: stable
+          brief: "Standard customer"
+        - id: premium
+          value: premium
+          stability: stable
+          brief: "Premium customer"
+    stability: stable
+    brief: "Customer tier for pricing and feature gates."

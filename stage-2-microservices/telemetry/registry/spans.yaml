@@ -1,0 +1,141 @@
+file_format: definition/2
+
+spans:
+  - type: ecommerce.user.register
+    kind: internal
+    stability: stable
+    name:
+      note: "register user"
+    brief: "Register a new user."
+    attributes:
+      - ref: ecommerce.customer.tier
+        requirement_level: required
+      - ref: ecommerce.user.id
+        requirement_level: required
+
+  - type: ecommerce.user.get
+    kind: internal
+    stability: stable
+    name:
+      note: "get user"
+    brief: "Look up a user by id."
+    attributes:
+      - ref: ecommerce.user.id
+        requirement_level: required
+
+  - type: ecommerce.user.list
+    kind: internal
+    stability: stable
+    name:
+      note: "list users"
+    brief: "List users."
+
+  - type: ecommerce.order.process
+    kind: internal
+    stability: stable
+    name:
+      note: "process order"
+    brief: "Process a single customer order end-to-end."
+    attributes:
+      - ref: ecommerce.user.id
+        requirement_level: required
+        sampling_relevant: true
+      - ref: ecommerce.payment.method
+        requirement_level: required
+        sampling_relevant: true
+      - ref: ecommerce.order.id
+        requirement_level: recommended
+      - ref: ecommerce.order.total
+        requirement_level: recommended
+      - ref: ecommerce.customer.tier
+        requirement_level: recommended
+
+  - type: ecommerce.order.background.process
+    kind: internal
+    stability: stable
+    name:
+      note: "process order in background"
+    brief: "Background processing of an order after the customer-facing request returned."
+    attributes:
+      - ref: ecommerce.order.id
+        requirement_level: required
+
+  - type: ecommerce.order.get
+    kind: internal
+    stability: stable
+    name:
+      note: "get order"
+    brief: "Look up an order by id."
+    attributes:
+      - ref: ecommerce.order.id
+        requirement_level: required
+
+  - type: ecommerce.order.list
+    kind: internal
+    stability: stable
+    name:
+      note: "list orders"
+    brief: "List orders for a user."
+    attributes:
+      - ref: ecommerce.user.id
+        requirement_level: required
+
+  - type: ecommerce.order.status.update
+    kind: internal
+    stability: stable
+    name:
+      note: "update order status"
+    brief: "Update the status of an existing order."
+    attributes:
+      - ref: ecommerce.order.id
+        requirement_level: required
+
+  - type: ecommerce.product.lookup
+    kind: internal
+    stability: stable
+    name:
+      note: "lookup product"
+    brief: "Look up a product by id."
+    attributes:
+      - ref: ecommerce.product.id
+        requirement_level: required
+
+  - type: ecommerce.product.list
+    kind: internal
+    stability: stable
+    name:
+      note: "list products"
+    brief: "List products, optionally filtered by category."
+    attributes:
+      - ref: ecommerce.product.category
+        requirement_level: recommended
+
+  - type: ecommerce.product.create
+    kind: internal
+    stability: stable
+    name:
+      note: "create product"
+    brief: "Create a new product."
+    attributes:
+      - ref: ecommerce.product.category
+        requirement_level: required
+
+  - type: ecommerce.product.stock.update
+    kind: internal
+    stability: stable
+    name:
+      note: "update product stock"
+    brief: "Update the stock count for a product."
+    attributes:
+      - ref: ecommerce.product.id
+        requirement_level: required
+
+  - type: ecommerce.inventory.check
+    kind: internal
+    stability: stable
+    name:
+      note: "check inventory"
+    brief: "Check that there is enough stock to fulfil a request."
+    attributes:
+      - ref: ecommerce.product.id
+        requirement_level: required
