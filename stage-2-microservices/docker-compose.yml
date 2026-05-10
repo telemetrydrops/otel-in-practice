@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:z
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:latest
+    ports:
+      - "3000:3000"
+      - "4318:4318"
+
+volumes:
+  postgres-data:
