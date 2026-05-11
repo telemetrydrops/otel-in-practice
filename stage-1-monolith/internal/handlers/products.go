@@ -38,7 +38,7 @@ func (h *ProductHandler) RegisterRoutes(router *gin.RouterGroup) {
 type CreateProductRequest struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
-	Category    string  `json:"category" binding:"required"`
+	Category    string  `json:"category" binding:"required,oneof=Electronics Accessories Clothing Books Sports Home"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
 	Stock       int     `json:"stock" binding:"min=0"`
 }
