@@ -17,6 +17,26 @@ import (
 	"gorm.io/gorm"
 )
 
+// knownProductCategories is the closed set of valid product categories used as metric dimensions.
+// Any category not in this set will be bucketed as "other" to prevent unbounded cardinality.
+var knownProductCategories = map[string]struct{}{
+	"Electronics": {},
+	"Accessories": {},
+	"Clothing":    {},
+	"Books":       {},
+	"Sports":      {},
+	"Home":        {},
+}
+
+// normalizeProductCategory returns the category unchanged when it is a known value,
+// and returns "other" for any unrecognized value.
+func normalizeProductCategory(category string) string {
+	if _, ok := knownProductCategories[category]; ok {
+		return category
+	}
+	return "other"
+}
+
 // ProductService handles product business logic
 type ProductService struct {
 	repo           *repositories.ProductRepository
@@ -88,10 +108,10 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 		return nil, fmt.Errorf("getting product: %w", err)
 	}
 
-	// Record metric
+	// Record metric — normalize category to a bounded set to prevent unbounded cardinality.
 	s.lookupCounter.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
+			attribute.String(telemetry.AttrEcommerceProductCategory, normalizeProductCategory(product.Category)),
 		))
 
 	// Use IsRecording to guard expensive attribute computation
