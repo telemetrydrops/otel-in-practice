@@ -45,7 +45,6 @@ func (r *ProductRepository) GetByID(ctx context.Context, id string) (*models.Pro
 	var product models.Product
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&product).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			span.SetStatus(codes.Error, "product not found")
 			return nil, err
 		}
 		telemetry.EmitException(ctx, err)

@@ -63,7 +63,6 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 	product, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			span.SetStatus(codes.Error, "product not found")
 			return nil, ErrProductNotFound
 		}
 		telemetry.EmitException(ctx, err)
