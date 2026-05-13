@@ -1,0 +1,3 @@
+grpc_port: "9090"
+database:
+  dsn: "host=localhost port=5432 user=ecommerce password=ecommerce dbname=catalog sslmode=disable"
