@@ -8,7 +8,7 @@ const (
 {% for group in ctx %}
 {% for span in group.spans %}
     {{ span.brief | comment(format="go") }}
-    Span{{ span.id | replace("span.", "") | pascal_case_const }}Name = "{{ span.name }}"
+    Span{{ span.id | replace("span.", "") | pascal_case_const }}Name = "{{ span.annotations.runtime_name }}"
 {% endfor %}
 {% endfor %}
 )

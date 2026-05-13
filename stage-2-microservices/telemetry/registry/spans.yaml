@@ -5,8 +5,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "register user"
+      note: "ecommerce.user.register"
     brief: "Register a new user."
+    annotations:
+      runtime_name: "register user"
     attributes:
       - ref: ecommerce.customer.tier
         requirement_level: required
@@ -17,8 +19,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "get user"
+      note: "ecommerce.user.get"
     brief: "Look up a user by id."
+    annotations:
+      runtime_name: "get user"
     attributes:
       - ref: ecommerce.user.id
         requirement_level: required
@@ -27,15 +31,19 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "list users"
+      note: "ecommerce.user.list"
     brief: "List users."
+    annotations:
+      runtime_name: "list users"
 
   - type: ecommerce.order.process
     kind: internal
     stability: stable
     name:
-      note: "process order"
+      note: "ecommerce.order.process"
     brief: "Process a single customer order end-to-end."
+    annotations:
+      runtime_name: "process order"
     attributes:
       - ref: ecommerce.user.id
         requirement_level: required
@@ -54,8 +62,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "process order in background"
+      note: "ecommerce.order.background.process"
     brief: "Background processing of an order after the customer-facing request returned."
+    annotations:
+      runtime_name: "process order in background"
     attributes:
       - ref: ecommerce.order.id
         requirement_level: required
@@ -64,8 +74,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "get order"
+      note: "ecommerce.order.get"
     brief: "Look up an order by id."
+    annotations:
+      runtime_name: "get order"
     attributes:
       - ref: ecommerce.order.id
         requirement_level: required
@@ -74,8 +86,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "list orders"
+      note: "ecommerce.order.list"
     brief: "List orders for a user."
+    annotations:
+      runtime_name: "list orders"
     attributes:
       - ref: ecommerce.user.id
         requirement_level: required
@@ -84,8 +98,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "update order status"
+      note: "ecommerce.order.status.update"
     brief: "Update the status of an existing order."
+    annotations:
+      runtime_name: "update order status"
     attributes:
       - ref: ecommerce.order.id
         requirement_level: required
@@ -94,8 +110,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "lookup product"
+      note: "ecommerce.product.lookup"
     brief: "Look up a product by id."
+    annotations:
+      runtime_name: "lookup product"
     attributes:
       - ref: ecommerce.product.id
         requirement_level: required
@@ -104,8 +122,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "list products"
+      note: "ecommerce.product.list"
     brief: "List products, optionally filtered by category."
+    annotations:
+      runtime_name: "list products"
     attributes:
       - ref: ecommerce.product.category
         requirement_level: recommended
@@ -114,8 +134,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "create product"
+      note: "ecommerce.product.create"
     brief: "Create a new product."
+    annotations:
+      runtime_name: "create product"
     attributes:
       - ref: ecommerce.product.category
         requirement_level: required
@@ -124,8 +146,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "update product stock"
+      note: "ecommerce.product.stock.update"
     brief: "Update the stock count for a product."
+    annotations:
+      runtime_name: "update product stock"
     attributes:
       - ref: ecommerce.product.id
         requirement_level: required
@@ -134,8 +158,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "check inventory"
+      note: "ecommerce.inventory.check"
     brief: "Check that there is enough stock to fulfil a request."
+    annotations:
+      runtime_name: "check inventory"
     attributes:
       - ref: ecommerce.product.id
         requirement_level: required
