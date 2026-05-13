@@ -146,7 +146,7 @@ The registry contains **only org-local `ecommerce.*` entries**. HTTP, gRPC, and 
 | DB client | manual + semconv | `{db.operation} {db.sql.table}` | `SELECT products`, `INSERT orders` |
 | Internal business | our registry | **verb object** | `process order`, `lookup product` |
 
-Internal business spans use the **verb-object** convention at runtime. The Weaver registry keeps a stable dotted id with the runtime name in `name.note`:
+Internal business spans use the **verb-object** convention at runtime. The Weaver registry keeps a stable dotted id with the runtime name in `annotations.runtime_name`. (Weaver v0.22.1 does not surface `name.note` in the resolved schema, so the template reads from annotations instead.)
 
 ```yaml
 spans:
@@ -154,8 +154,10 @@ spans:
     kind: internal
     stability: stable
     name:
-      note: "process order"
+      note: "ecommerce.order.process"   # decorative; matches the type
     brief: "Process a single customer order end-to-end."
+    annotations:
+      runtime_name: "process order"     # read by the Go template
     attributes: [...]
 ```
 

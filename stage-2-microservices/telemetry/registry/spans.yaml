@@ -1,5 +1,11 @@
 file_format: definition/2
 
+# Every span entry carries an `annotations.runtime_name` field with the
+# verb-object string used at runtime (e.g. "process order"). The template at
+# telemetry/templates/registry/go/spans.go.j2 reads from there. Weaver v0.22.1
+# does NOT surface `name.note` in the resolved schema, so do not move runtime
+# names there.
+
 spans:
   - type: ecommerce.user.register
     kind: internal

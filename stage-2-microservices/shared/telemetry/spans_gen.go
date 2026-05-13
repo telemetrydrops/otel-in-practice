@@ -6,41 +6,54 @@ package telemetry
 const (
 
 	// Check that there is enough stock to fulfil a request.
+
 	SpanEcommerceInventoryCheckName = "check inventory"
 
 	// Background processing of an order after the customer-facing request returned.
+
 	SpanEcommerceOrderBackgroundProcessName = "process order in background"
 
 	// Look up an order by id.
+
 	SpanEcommerceOrderGetName = "get order"
 
 	// List orders for a user.
+
 	SpanEcommerceOrderListName = "list orders"
 
 	// Process a single customer order end-to-end.
+
 	SpanEcommerceOrderProcessName = "process order"
 
 	// Update the status of an existing order.
+
 	SpanEcommerceOrderStatusUpdateName = "update order status"
 
 	// Create a new product.
+
 	SpanEcommerceProductCreateName = "create product"
 
 	// List products, optionally filtered by category.
+
 	SpanEcommerceProductListName = "list products"
 
 	// Look up a product by id.
+
 	SpanEcommerceProductLookupName = "lookup product"
 
 	// Update the stock count for a product.
+
 	SpanEcommerceProductStockUpdateName = "update product stock"
 
 	// Look up a user by id.
+
 	SpanEcommerceUserGetName = "get user"
 
 	// List users.
+
 	SpanEcommerceUserListName = "list users"
 
 	// Register a new user.
+
 	SpanEcommerceUserRegisterName = "register user"
 )

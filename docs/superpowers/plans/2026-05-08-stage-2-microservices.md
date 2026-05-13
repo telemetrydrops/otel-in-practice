@@ -323,11 +323,15 @@ schema_url: https://telemetrydrops.com/schemas/ecommerce
 
 (Bumped from 0.1.0 to 0.2.0 because the runtime span names change.)
 
-- [ ] **Step 3: Update span name notes to verb-object form**
+- [ ] **Step 3: Add `annotations.runtime_name` to each span**
 
-Edit `stage-2-microservices/telemetry/registry/spans.yaml`. For every entry, replace the `name.note` value with the verb-object form. Use this mapping:
+Weaver v0.22.1 does NOT surface `name.note` in the resolved schema (the resolved `name` is always derived from the dotted `type`). The runtime span name therefore lives in `annotations.runtime_name`, which Weaver does pass through. The Jinja template (updated in Task 5) reads from there.
 
-| `type` | `name.note` (new) |
+Leave `name.note` alone — it stays equal to the dotted `type` and serves as decorative documentation.
+
+For every span entry in `stage-2-microservices/telemetry/registry/spans.yaml`, add a new `annotations.runtime_name` field with the verb-object string from this mapping:
+
+| `type` | `annotations.runtime_name` |
 |---|---|
 | `ecommerce.user.register` | `register user` |
 | `ecommerce.user.get` | `get user` |
@@ -343,7 +347,33 @@ Edit `stage-2-microservices/telemetry/registry/spans.yaml`. For every entry, rep
 | `ecommerce.product.stock.update` | `update product stock` |
 | `ecommerce.inventory.check` | `check inventory` |
 
-Leave `type`, `kind`, `stability`, `brief`, and `attributes` unchanged.
+Example transformation for one entry:
+
+```yaml
+- type: ecommerce.order.process
+  kind: internal
+  stability: stable
+  name:
+    note: "ecommerce.order.process"
+  brief: "Process a single customer order end-to-end."
+  annotations:
+    runtime_name: "process order"
+  attributes:
+    - ref: ecommerce.user.id
+      requirement_level: required
+      sampling_relevant: true
+    - ref: ecommerce.payment.method
+      requirement_level: required
+      sampling_relevant: true
+    - ref: ecommerce.order.id
+      requirement_level: recommended
+    - ref: ecommerce.order.total
+      requirement_level: recommended
+    - ref: ecommerce.customer.tier
+      requirement_level: recommended
+```
+
+Leave `type`, `kind`, `stability`, `name.note`, `brief`, and `attributes` unchanged.
 
 - [ ] **Step 4: Verify Weaver registry**
 
@@ -367,39 +397,75 @@ git commit -m "feat(stage-2): port telemetry registry with verb-object span name
 
 **Files:**
 
+- Modify: `stage-2-microservices/telemetry/templates/registry/go/spans.go.j2`
 - Create (generated): `stage-2-microservices/shared/telemetry/attributes_gen.go`
 - Create (generated): `stage-2-microservices/shared/telemetry/spans_gen.go`
 - Create (generated): `stage-2-microservices/shared/telemetry/metrics_gen.go`
 
-- [ ] **Step 1: Generate**
+- [ ] **Step 1: Update the Jinja template to read `annotations.runtime_name`**
+
+Edit `stage-2-microservices/telemetry/templates/registry/go/spans.go.j2`. Find the line that emits the constant:
+
+```jinja
+Span{{ span.id | replace("span.", "") | pascal_case_const }}Name = "{{ span.name }}"
+```
+
+and change it to:
+
+```jinja
+Span{{ span.id | replace("span.", "") | pascal_case_const }}Name = "{{ span.annotations.runtime_name }}"
+```
+
+`{{ span.name }}` in Weaver v0.22.1 always resolves to the dotted `type` (stripped of the `span.` prefix). The verb-object form lives in `annotations.runtime_name` (added in Task 4), which is what we want at runtime.
+
+- [ ] **Step 2: Generate**
+
+Weaver is provided via the `otel/weaver:v0.22.1` docker image. From the repo root:
 
 ```bash
-cd stage-2-microservices
-mkdir -p shared/telemetry
-weaver registry generate \
-  --registry telemetry/registry/ \
-  --templates telemetry/templates/ \
-  go shared/telemetry
+cd /home/jpkroehling/Projects/src/github.com/telemetrydrops/otel-in-practice
+mkdir -p stage-2-microservices/shared/telemetry
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/work" \
+  otel/weaver:v0.22.1 \
+  registry generate \
+    --registry /work/stage-2-microservices/telemetry/registry/ \
+    --templates /work/stage-2-microservices/telemetry/templates/ \
+    go \
+    /work/stage-2-microservices/shared/telemetry/
 ```
 
 Expected: three `*_gen.go` files appear under `shared/telemetry/`.
 
-- [ ] **Step 2: Format**
+- [ ] **Step 3: Format**
 
 ```bash
-cd stage-2-microservices
-gofmt -w shared/telemetry/
+gofmt -w stage-2-microservices/shared/telemetry/
 ```
 
-- [ ] **Step 3: Verify span constants use verb-object names**
+- [ ] **Step 4: Verify span constants use verb-object names**
 
 ```bash
 grep "SpanEcommerceOrderProcessName" stage-2-microservices/shared/telemetry/spans_gen.go
+grep "SpanEcommerceProductLookupName" stage-2-microservices/shared/telemetry/spans_gen.go
 ```
 
-Expected: `SpanEcommerceOrderProcessName = "process order"`. If it shows the dotted form, Step 3 of Task 4 was incomplete — fix and regenerate.
+Expected:
+- `SpanEcommerceOrderProcessName = "process order"`
+- `SpanEcommerceProductLookupName = "lookup product"`
 
-- [ ] **Step 4: Confirm package compiles**
+If either shows the dotted form, either Task 4's `annotations.runtime_name` is missing on that entry or Step 1's template edit was not applied. Fix and regenerate.
+
+Confirm 13 span constants total:
+
+```bash
+grep -c '^\s*SpanEcommerce' stage-2-microservices/shared/telemetry/spans_gen.go
+```
+
+Expected: `13`.
+
+- [ ] **Step 5: Confirm package compiles**
 
 ```bash
 cd stage-2-microservices
@@ -408,10 +474,10 @@ go build ./shared/telemetry/
 
 Expected: builds clean (the generated package only declares constants).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add stage-2-microservices/shared/telemetry/
+git add stage-2-microservices/telemetry/templates/registry/go/spans.go.j2 stage-2-microservices/shared/telemetry/
 git commit -m "feat(stage-2): generate weaver constants into shared/telemetry"
 ```
 
@@ -3086,6 +3152,6 @@ git commit -m "feat(stage-2): wire compose stack and finalize README"
 - [ ] `weaver registry check` passes against `telemetry/registry/`
 - [ ] Generated `shared/telemetry/*_gen.go` is in sync with the registry (`weaver registry generate ...` produces no diff)
 - [ ] Smoke test in Task 19 produced a 7-span trace in Grafana spanning both services
-- [ ] No span name in the registry contains the dotted form in `name.note` (all use verb-object)
+- [ ] Every span entry has an `annotations.runtime_name` with the verb-object form, and `spans_gen.go` reflects those values
 - [ ] No `db.*`, `http.*`, or `rpc.*` entries appear in the local registry
 - [ ] `docker compose up -d --build` brings up the full stack from a clean checkout
