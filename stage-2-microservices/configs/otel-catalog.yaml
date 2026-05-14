@@ -17,17 +17,17 @@ tracer_provider:
     - batch:
         exporter:
           otlp_http:
-            endpoint: http://localhost:4318/v1/traces
+            endpoint: http://otel-lgtm:4318/v1/traces
 meter_provider:
   readers:
     - periodic:
         interval: 15000
         exporter:
           otlp_http:
-            endpoint: http://localhost:4318/v1/metrics
+            endpoint: http://otel-lgtm:4318/v1/metrics
 logger_provider:
   processors:
     - batch:
         exporter:
           otlp_http:
-            endpoint: http://localhost:4318/v1/logs
+            endpoint: http://otel-lgtm:4318/v1/logs
