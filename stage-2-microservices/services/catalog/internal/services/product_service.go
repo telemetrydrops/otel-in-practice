@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
@@ -60,6 +61,10 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Pro
 		trace.WithAttributes(attribute.String(telemetry.AttrEcommerceProductId, id)))
 	defer span.End()
 
+	if m := baggage.FromContext(ctx).Member(telemetry.BaggageCustomerTier); m.Key() != "" {
+		span.SetAttributes(attribute.String(telemetry.AttrEcommerceCustomerTier, m.Value()))
+	}
+
 	product, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -88,7 +93,6 @@ func (s *ProductService) ListProducts(ctx context.Context, category string, limi
 	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductListName,
 		trace.WithAttributes(
 			attribute.String(telemetry.AttrEcommerceProductCategory, category),
-			attribute.Int("limit", limit),
 		))
 	defer span.End()
 
@@ -99,6 +103,5 @@ func (s *ProductService) ListProducts(ctx context.Context, category string, limi
 		return nil, fmt.Errorf("listing products: %w", err)
 	}
 
-	span.SetAttributes(attribute.Int("result.count", len(products)))
 	return products, nil
 }

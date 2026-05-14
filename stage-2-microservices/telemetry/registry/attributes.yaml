@@ -64,3 +64,13 @@ attributes:
           brief: "Premium customer"
     stability: stable
     brief: "Customer tier for pricing and feature gates."
+
+  - key: ecommerce.inventory.available
+    type: boolean
+    stability: stable
+    brief: "Whether the requested quantity of a product is available in stock."
+
+  - key: ecommerce.inventory.stock_qty
+    type: int
+    stability: stable
+    brief: "Current stock level for the queried product."

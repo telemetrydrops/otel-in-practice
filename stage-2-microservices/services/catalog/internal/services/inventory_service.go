@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
@@ -37,9 +38,12 @@ func (s *InventoryService) CheckInventory(ctx context.Context, productID string,
 	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceInventoryCheckName,
 		trace.WithAttributes(
 			attribute.String(telemetry.AttrEcommerceProductId, productID),
-			attribute.Int("requested.qty", int(qty)),
 		))
 	defer span.End()
+
+	if m := baggage.FromContext(ctx).Member(telemetry.BaggageCustomerTier); m.Key() != "" {
+		span.SetAttributes(attribute.String(telemetry.AttrEcommerceCustomerTier, m.Value()))
+	}
 
 	product, err := s.repo.GetByID(ctx, productID)
 	if err != nil {
@@ -53,8 +57,8 @@ func (s *InventoryService) CheckInventory(ctx context.Context, productID string,
 
 	available := product.StockQty >= qty
 	span.SetAttributes(
-		attribute.Bool("inventory.available", available),
-		attribute.Int("inventory.stock_qty", int(product.StockQty)),
+		attribute.Bool(telemetry.AttrEcommerceInventoryAvailable, available),
+		attribute.Int(telemetry.AttrEcommerceInventoryStockqty, int(product.StockQty)),
 	)
 	return available, product.StockQty, nil
 }

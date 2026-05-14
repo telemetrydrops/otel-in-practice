@@ -8,6 +8,12 @@ const (
 	// Customer tier for pricing and feature gates.
 	AttrEcommerceCustomerTier = "ecommerce.customer.tier"
 
+	// Whether the requested quantity of a product is available in stock.
+	AttrEcommerceInventoryAvailable = "ecommerce.inventory.available"
+
+	// Current stock level for the queried product.
+	AttrEcommerceInventoryStockqty = "ecommerce.inventory.stock_qty"
+
 	// Identifier of the order being processed.
 	AttrEcommerceOrderId = "ecommerce.order.id"
 
