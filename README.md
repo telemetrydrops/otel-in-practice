@@ -35,6 +35,9 @@ The instrumented version of the monolith.
   - Semantic conventions for database operations
 - **Use Case:** Reference implementation for the Traces API lesson. See each concept in context across handlers, services, and repositories.
 
+### [stage-1-monolith-programmatic](./stage-1-monolith-programmatic)
+Temporary teaching variant of `stage-1-monolith` that assembles the OpenTelemetry Go SDK programmatically. It demonstrates the shared resource, all three providers, OTLP/HTTP exporters, batching, sampling, a periodic metric reader, views, exemplars, propagation, and coordinated shutdown.
+
 ## Prerequisites
 
 - **Go:** 1.24 or higher

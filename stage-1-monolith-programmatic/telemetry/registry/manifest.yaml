@@ -1,0 +1,4 @@
+name: ecommerce
+description: "Telemetry conventions for the ecommerce monolith"
+semconv_version: 0.1.0
+schema_url: https://telemetrydrops.com/schemas/ecommerce
