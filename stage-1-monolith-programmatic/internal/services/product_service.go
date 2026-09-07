@@ -1,0 +1,214 @@
+package services
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+
+	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith-programmatic/internal/models"
+	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith-programmatic/internal/repositories"
+	"github.com/telemetrydrops/otel-in-practice/stage-1-monolith-programmatic/internal/telemetry"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+	"gorm.io/gorm"
+)
+
+// ProductService handles product business logic
+type ProductService struct {
+	repo           *repositories.ProductRepository
+	logger         *slog.Logger
+	tracer         trace.Tracer
+	lookupCounter  metric.Int64Counter
+	inventoryGauge metric.Float64ObservableGauge
+}
+
+// NewProductService creates a new product service
+func NewProductService(repo *repositories.ProductRepository, logger *slog.Logger) (*ProductService, error) {
+	meter := otel.Meter(telemetry.Scope)
+	lookupCounter, err := meter.Int64Counter(
+		telemetry.EcommerceProductsLookupsName,
+		metric.WithDescription("Total number of product lookups"),
+		metric.WithUnit(telemetry.EcommerceProductsLookupsUnit),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating lookup counter: %w", err)
+	}
+
+	svc := &ProductService{
+		repo:          repo,
+		logger:        logger,
+		tracer:        otel.Tracer(telemetry.Scope),
+		lookupCounter: lookupCounter,
+	}
+
+	// Register an observable gauge with a callback.
+	// The SDK calls this function on each metric collection interval.
+	inventoryGauge, err := meter.Float64ObservableGauge(
+		telemetry.EcommerceProductsInventoryValueName,
+		metric.WithDescription("Total value of products currently in stock"),
+		metric.WithUnit(telemetry.EcommerceProductsInventoryValueUnit),
+		metric.WithFloat64Callback(func(ctx context.Context, o metric.Float64Observer) error {
+			value, err := repo.GetTotalInventoryValue(context.Background())
+			if err != nil {
+				logger.WarnContext(ctx, "Failed to read inventory value for metric", "error", err)
+				return nil
+			}
+			o.Observe(value)
+			return nil
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating inventory gauge: %w", err)
+	}
+	svc.inventoryGauge = inventoryGauge
+
+	return svc, nil
+}
+
+// GetProduct retrieves a product by ID
+func (s *ProductService) GetProduct(ctx context.Context, id string) (*models.Product, error) {
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductLookupName,
+		trace.WithAttributes(
+			attribute.String(telemetry.AttrEcommerceProductId, id),
+		))
+	defer span.End()
+
+	product, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			span.SetStatus(codes.Error, "product not found")
+			return nil, fmt.Errorf("product not found: %s", id)
+		}
+		telemetry.EmitException(ctx, err)
+		span.SetStatus(codes.Error, "product retrieval failed")
+		return nil, fmt.Errorf("getting product: %w", err)
+	}
+
+	// Record metric
+	s.lookupCounter.Add(ctx, 1,
+		metric.WithAttributes(
+			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
+		))
+
+	// Use IsRecording to guard expensive attribute computation
+	if span.IsRecording() {
+		span.SetAttributes(
+			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
+			attribute.Float64("product.price", product.Price),
+			attribute.Int("product.stock", product.Stock),
+		)
+	}
+
+	return product, nil
+}
+
+// ListProducts retrieves products with optional filters
+func (s *ProductService) ListProducts(ctx context.Context, category string, limit int) ([]*models.Product, error) {
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductListName,
+		trace.WithAttributes(
+			attribute.String(telemetry.AttrEcommerceProductCategory, category),
+			attribute.Int("limit", limit),
+		))
+	defer span.End()
+
+	s.logger.InfoContext(ctx, "Listing products",
+		"category", category,
+		"limit", limit)
+
+	products, err := s.repo.List(ctx, category, limit)
+	if err != nil {
+		telemetry.EmitException(ctx, err)
+		span.SetStatus(codes.Error, "product listing failed")
+		return nil, fmt.Errorf("listing products: %w", err)
+	}
+
+	span.SetAttributes(attribute.Int("result.count", len(products)))
+	return products, nil
+}
+
+// CreateProduct adds a new product to the catalog
+func (s *ProductService) CreateProduct(ctx context.Context, product *models.Product) error {
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductCreateName,
+		trace.WithAttributes(
+			attribute.String("product.name", product.Name),
+			attribute.String(telemetry.AttrEcommerceProductCategory, product.Category),
+			attribute.Float64("product.price", product.Price),
+		))
+	defer span.End()
+
+	if product.Price <= 0 {
+		span.SetStatus(codes.Error, "invalid product price")
+		return fmt.Errorf("product price must be positive")
+	}
+
+	if product.Stock < 0 {
+		span.SetStatus(codes.Error, "invalid product stock")
+		return fmt.Errorf("product stock cannot be negative")
+	}
+
+	if err := s.repo.Create(ctx, product); err != nil {
+		telemetry.EmitException(ctx, err)
+		span.SetStatus(codes.Error, "product creation failed")
+		return fmt.Errorf("creating product: %w", err)
+	}
+
+	span.SetAttributes(attribute.String(telemetry.AttrEcommerceProductId, product.ID))
+	telemetry.EmitEvent(ctx, "product created successfully")
+
+	s.logger.InfoContext(ctx, "Product created",
+		"product_id", product.ID,
+		"name", product.Name)
+
+	return nil
+}
+
+// CheckInventory verifies if a product has sufficient stock
+func (s *ProductService) CheckInventory(ctx context.Context, productID string, quantity int) (bool, error) {
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceInventoryCheckName,
+		trace.WithAttributes(
+			attribute.String(telemetry.AttrEcommerceProductId, productID),
+			attribute.Int("requested.quantity", quantity),
+		))
+	defer span.End()
+
+	hasStock, err := s.repo.CheckStock(ctx, productID, quantity)
+	if err != nil {
+		telemetry.EmitException(ctx, err)
+		span.SetStatus(codes.Error, "inventory check failed")
+		return false, fmt.Errorf("checking inventory: %w", err)
+	}
+
+	span.SetAttributes(attribute.Bool("inventory.available", hasStock))
+
+	if !hasStock {
+		telemetry.EmitEvent(ctx, "insufficient inventory")
+		s.logger.WarnContext(ctx, "Insufficient inventory",
+			"product_id", productID,
+			"requested", quantity)
+	}
+
+	return hasStock, nil
+}
+
+// UpdateStock adjusts the stock level of a product
+func (s *ProductService) UpdateStock(ctx context.Context, productID string, quantityChange int) error {
+	ctx, span := s.tracer.Start(ctx, telemetry.SpanEcommerceProductStockUpdateName,
+		trace.WithAttributes(
+			attribute.String(telemetry.AttrEcommerceProductId, productID),
+			attribute.Int("quantity.change", quantityChange),
+		))
+	defer span.End()
+
+	if err := s.repo.UpdateStock(ctx, productID, quantityChange); err != nil {
+		telemetry.EmitException(ctx, err)
+		span.SetStatus(codes.Error, "stock update failed")
+		return fmt.Errorf("updating stock: %w", err)
+	}
+
+	telemetry.EmitEvent(ctx, "stock updated successfully")
+	return nil
+}
