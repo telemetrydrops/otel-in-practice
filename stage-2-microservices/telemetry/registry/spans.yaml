@@ -1,0 +1,173 @@
+file_format: definition/2
+
+# Every span entry carries an `annotations.runtime_name` field with the
+# verb-object string used at runtime (e.g. "process order"). The template at
+# telemetry/templates/registry/go/spans.go.j2 reads from there. Weaver v0.22.1
+# does NOT surface `name.note` in the resolved schema, so do not move runtime
+# names there.
+
+spans:
+  - type: ecommerce.user.register
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.user.register"
+    brief: "Register a new user."
+    annotations:
+      runtime_name: "register user"
+    attributes:
+      - ref: ecommerce.customer.tier
+        requirement_level: required
+      - ref: ecommerce.user.id
+        requirement_level: required
+
+  - type: ecommerce.user.get
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.user.get"
+    brief: "Look up a user by id."
+    annotations:
+      runtime_name: "get user"
+    attributes:
+      - ref: ecommerce.user.id
+        requirement_level: required
+
+  - type: ecommerce.user.list
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.user.list"
+    brief: "List users."
+    annotations:
+      runtime_name: "list users"
+
+  - type: ecommerce.order.process
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.order.process"
+    brief: "Process a single customer order end-to-end."
+    annotations:
+      runtime_name: "process order"
+    attributes:
+      - ref: ecommerce.user.id
+        requirement_level: required
+        sampling_relevant: true
+      - ref: ecommerce.payment.method
+        requirement_level: required
+        sampling_relevant: true
+      - ref: ecommerce.order.id
+        requirement_level: recommended
+      - ref: ecommerce.order.total
+        requirement_level: recommended
+      - ref: ecommerce.customer.tier
+        requirement_level: recommended
+
+  - type: ecommerce.order.background.process
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.order.background.process"
+    brief: "Background processing of an order after the customer-facing request returned."
+    annotations:
+      runtime_name: "process order in background"
+    attributes:
+      - ref: ecommerce.order.id
+        requirement_level: required
+
+  - type: ecommerce.order.get
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.order.get"
+    brief: "Look up an order by id."
+    annotations:
+      runtime_name: "get order"
+    attributes:
+      - ref: ecommerce.order.id
+        requirement_level: required
+
+  - type: ecommerce.order.list
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.order.list"
+    brief: "List orders for a user."
+    annotations:
+      runtime_name: "list orders"
+    attributes:
+      - ref: ecommerce.user.id
+        requirement_level: required
+
+  - type: ecommerce.order.status.update
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.order.status.update"
+    brief: "Update the status of an existing order."
+    annotations:
+      runtime_name: "update order status"
+    attributes:
+      - ref: ecommerce.order.id
+        requirement_level: required
+
+  - type: ecommerce.product.lookup
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.product.lookup"
+    brief: "Look up a product by id."
+    annotations:
+      runtime_name: "lookup product"
+    attributes:
+      - ref: ecommerce.product.id
+        requirement_level: required
+
+  - type: ecommerce.product.list
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.product.list"
+    brief: "List products, optionally filtered by category."
+    annotations:
+      runtime_name: "list products"
+    attributes:
+      - ref: ecommerce.product.category
+        requirement_level: recommended
+
+  - type: ecommerce.product.create
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.product.create"
+    brief: "Create a new product."
+    annotations:
+      runtime_name: "create product"
+    attributes:
+      - ref: ecommerce.product.category
+        requirement_level: required
+
+  - type: ecommerce.product.stock.update
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.product.stock.update"
+    brief: "Update the stock count for a product."
+    annotations:
+      runtime_name: "update product stock"
+    attributes:
+      - ref: ecommerce.product.id
+        requirement_level: required
+
+  - type: ecommerce.inventory.check
+    kind: internal
+    stability: stable
+    name:
+      note: "ecommerce.inventory.check"
+    brief: "Check that there is enough stock to fulfil a request."
+    annotations:
+      runtime_name: "check inventory"
+    attributes:
+      - ref: ecommerce.product.id
+        requirement_level: required

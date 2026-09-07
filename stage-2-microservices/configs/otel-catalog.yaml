@@ -1,0 +1,33 @@
+file_format: "1.0"
+disabled: false
+resource:
+  attributes:
+    - name: service.name
+      value: catalog-service
+    - name: service.namespace
+      value: ecommerce
+    - name: deployment.environment.name
+      value: dev
+propagator:
+  composite:
+    - tracecontext:
+    - baggage:
+tracer_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp_http:
+            endpoint: http://otel-lgtm:4318/v1/traces
+meter_provider:
+  readers:
+    - periodic:
+        interval: 15000
+        exporter:
+          otlp_http:
+            endpoint: http://otel-lgtm:4318/v1/metrics
+logger_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp_http:
+            endpoint: http://otel-lgtm:4318/v1/logs

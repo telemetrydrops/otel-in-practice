@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:z
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "ecommerce", "-d", "postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:latest
+    ports:
+      - "3000:3000"
+      - "4318:4318"
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.catalog
+    environment:
+      DATABASE_URL: "host=postgres port=5432 user=ecommerce password=ecommerce dbname=catalog sslmode=disable"
+      GRPC_PORT: "9090"
+    ports:
+      - "9090:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-lgtm:
+        condition: service_started
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.order
+    environment:
+      DATABASE_URL: "host=postgres port=5432 user=ecommerce password=ecommerce dbname=orders sslmode=disable"
+      HTTP_PORT: "8080"
+      CATALOG_GRPC_ADDR: "catalog-service:9090"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+      otel-lgtm:
+        condition: service_started
+
+volumes:
+  postgres-data:

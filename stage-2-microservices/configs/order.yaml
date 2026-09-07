@@ -1,0 +1,5 @@
+http_port: "8080"
+database:
+  dsn: "host=localhost port=5432 user=ecommerce password=ecommerce dbname=orders sslmode=disable"
+catalog:
+  address: "localhost:9090"
