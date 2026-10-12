@@ -9,9 +9,15 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     steps:
       - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: stage-1-monolith/go.mod
+          cache: false
 
       - name: Validate the registry
         env:
