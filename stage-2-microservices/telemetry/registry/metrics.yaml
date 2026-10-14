@@ -1,0 +1,37 @@
+file_format: definition/2
+
+metrics:
+  - name: ecommerce.orders.processing.duration
+    instrument: histogram
+    unit: s
+    stability: stable
+    brief: "End-to-end duration of processing a single order."
+    attributes:
+      - ref: ecommerce.payment.method
+        requirement_level: required
+      - ref: ecommerce.customer.tier
+        requirement_level: recommended
+
+  - name: ecommerce.orders.active
+    instrument: updowncounter
+    unit: "{order}"
+    stability: stable
+    brief: "Number of orders currently being processed."
+
+  - name: ecommerce.users.registrations
+    instrument: counter
+    unit: "{registration}"
+    stability: stable
+    brief: "Total number of successful user registrations."
+
+  - name: ecommerce.products.lookups
+    instrument: counter
+    unit: "{lookup}"
+    stability: stable
+    brief: "Total number of product lookups."
+
+  - name: ecommerce.products.inventory.value
+    instrument: gauge
+    unit: "USD"
+    stability: stable
+    brief: "Current value of products currently in stock, in USD."

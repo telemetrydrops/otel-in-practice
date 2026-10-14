@@ -1,0 +1,32 @@
+text_maps:
+  go_types:
+    int: int64
+    double: float64
+    string: string
+    boolean: bool
+
+acronyms: ["HTTP", "API", "ID", "URL", "DB"]
+
+comment_formats:
+  go:
+    format: markdown
+    prefix: "// "
+
+params:
+  package_name: telemetry
+
+templates:
+  - template: attributes.go.j2
+    filter: semconv_grouped_attributes
+    application_mode: single
+    file_name: "attributes_gen.go"
+
+  - template: metrics.go.j2
+    filter: semconv_grouped_metrics
+    application_mode: single
+    file_name: "metrics_gen.go"
+
+  - template: spans.go.j2
+    filter: 'semconv_signal("span"; {}) | group_by(.root_namespace) | map({root_namespace: .[0].root_namespace, spans: . | sort_by(.id)})'
+    application_mode: single
+    file_name: "spans_gen.go"
